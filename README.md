@@ -11,7 +11,7 @@ AI DocuSearch supports:
 - Cleaning and chunking for retrieval
 - Lightweight retrieval fallback for low-memory environments
 - Live LLM integration with any OpenAI-compatible provider (OpenAI, xAI/Grok, Groq, etc.)
-- A single browser app that runs RAG, Direct LLM, and Hybrid modes side by side with speed/token metrics
+- A single browser app that runs RAG, Direct LLM, and Hybrid modes side by side with optional speed/token metrics
 - Git-ready project structure and documentation
 
 ## Why this project exists
@@ -63,7 +63,11 @@ AI DocuSearch/
 │   ├── embed_index.py
 │   ├── ingest.py
 │   ├── pipeline.py
-│   └── preprocess.py
+│   ├── preprocess.py
+│   └── prompt_loader.py
+├── prompts/
+│   ├── rag_prompt.txt
+│   └── direct_llm_prompt.txt
 ├── Docs/
 │   ├── MASTER_GUIDE.md
 │   ├── STEP_1_INGEST.md
@@ -134,10 +138,12 @@ After uploading a document and asking a question, use the **RAG Mode**, **Direct
 - **Hybrid Mode** — tries the full RAG pipeline first and automatically falls back to Direct LLM
   behavior if the embedding pipeline fails (e.g. low memory).
 
-Each tab reports metrics for that run: total time, build/retrieval/generation time breakdown,
-chunks used, context size, and prompt/completion/total token counts (from the provider's `usage`
-field when available, otherwise estimated). Once two or more modes have been run, a comparison
-table summarizes all of them side by side.
+Each tab shows the answer with a **📊 Show metrics** button underneath — click it to reveal that
+run's total time, build/retrieval/generation time breakdown, chunks used, context size, and
+prompt/completion/total token counts (from the provider's `usage` field when available, otherwise
+estimated). Metrics stay hidden until requested, keeping the default view focused on the answer.
+Once two or more modes have been run, a **📊 Show mode comparison** button appears to reveal a
+side-by-side table of all of them.
 
 ## Example usage
 
@@ -160,7 +166,17 @@ This means:
 - `src/ai_query.py` — live LLM request wrapper (any OpenAI-compatible provider)
 - `src/ingest.py` — document ingestion and text extraction
 - `src/preprocess.py` — document cleaning and chunk splitting
+- `src/prompt_loader.py` — loads prompt templates from `prompts/`
+- `prompts/rag_prompt.txt` — prompt template used by RAG mode (and Hybrid mode when it succeeds)
+- `prompts/direct_llm_prompt.txt` — prompt template used by Direct LLM mode (and Hybrid mode when it falls back)
 - `web_app.py` — unified browser app with RAG / Direct LLM / Hybrid mode tabs and metrics
+
+## Adjusting temperature
+
+There is no temperature control in the UI. Instead, edit the `# temperature: <value>` line at the
+top of `prompts/rag_prompt.txt` or `prompts/direct_llm_prompt.txt` directly — e.g. change it to
+`# temperature: 0.7` for more varied answers. This line is stripped before the prompt is sent to
+the LLM. If a prompt file has no such line, `LLM_TEMPERATURE` from `.env` is used, then `0.2`.
 
 ## Optional: LangSmith tracing
 

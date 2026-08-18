@@ -23,7 +23,9 @@ The AI query step generates answers to user questions based on the context retri
   base URL, and model name that speak the OpenAI chat completions format
 
 ### Generation Parameters
-- **Temperature:** Fixed at `0.2` for the request (low randomness, more deterministic answers)
+- **Temperature:** Configurable (see Step 4.1b) — defaults to `0.2` (low randomness, more
+  deterministic answers); set per-prompt via a `# temperature: <value>` directive line at the top
+  of the prompt's `.txt` file (see Step 4.5) rather than a runtime control
 - **Timeout:** 60 seconds per request
 
 ---
@@ -42,7 +44,8 @@ def generate_answer(prompt: str, model_name: Optional[str] = None) -> str:
    - `base_url` — `LLM_API_BASE`, else `OPENAI_API_BASE`, else `XAI_API_BASE`, else `GROK_API_BASE`;
      if still unset and `OPENAI_API_KEY` is present, defaults to `https://api.openai.com/v1`
    - `resolved_model` — `model_name` argument, else `LLM_MODEL`, else `OPENAI_MODEL`, else `XAI_MODEL`, else `GROK_MODEL`
-2. **Debug logging:** prints whether an API key is present, the base URL, and the resolved model to `stderr`.
+2. **Debug logging:** prints whether an API key is present, the base URL, the resolved model, and
+   the resolved temperature to `stderr`.
 3. If `api_key`, `base_url`, and `resolved_model` are all present, proceed to Step 4.2. Otherwise, skip directly to the simulated fallback (Step 4.3).
 
 **`LLM_*` variables are the recommended, provider-agnostic way to configure this project.** The
@@ -54,6 +57,7 @@ backward compatibility, but new setups should prefer `LLM_API_KEY` / `LLM_API_BA
 LLM_API_KEY=your_key_here
 LLM_API_BASE=https://api.x.ai/v1
 LLM_MODEL=grok-4
+LLM_TEMPERATURE=0.2
 ```
 
 ```env
@@ -65,6 +69,29 @@ LLM_MODEL=gpt-4o-mini
 
 ---
 
+### Step 4.1b: Resolve Temperature
+```python
+def generate_answer_with_meta(
+    prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
+) -> Dict[str, Any]:
+```
+
+`generate_answer_with_meta` itself just accepts an optional `temperature` argument and falls back
+to the `LLM_TEMPERATURE` env var, then `0.2`, if it's not passed. The actual place users are meant
+to edit temperature is the prompt file, not this function's argument — see Step 4.5 and
+`src/prompt_loader.load_prompt_with_temperature`, which callers (`src/pipeline.py`, `web_app.py`)
+use to read a prompt's `# temperature: <value>` directive and pass it in as this argument.
+
+Precedence for the resolved temperature:
+1. A `# temperature: <value>` directive on the first line of the prompt's `.txt` file (Step 4.5)
+2. The `LLM_TEMPERATURE` environment variable, if set
+3. A default of `0.2`
+
+The resolved value is included in the returned metrics dict (see Step 4.4) as `"temperature"`, so
+callers and the LangSmith trace both record which temperature produced a given answer.
+
+---
+
 ### Step 4.2: Call the LLM API
 **Process:**
 
@@ -73,7 +100,7 @@ LLM_MODEL=gpt-4o-mini
    payload = {
        "model": resolved_model,
        "messages": [{"role": "user", "content": prompt}],
-       "temperature": 0.2,
+       "temperature": resolved_temperature,
    }
    headers = {
        "Authorization": f"Bearer {api_key}",
@@ -132,26 +159,59 @@ returns a dict instead of a bare string so callers can display timing and token 
   a `len(text) // 4` heuristic (`_estimate_tokens`) for both the prompt and the answer, and
   `estimated_tokens` is `True`.
 
-`generate_answer(prompt, model_name)` is now implemented as a thin wrapper:
+`generate_answer(prompt, model_name, temperature)` is now implemented as a thin wrapper:
 ```python
-def generate_answer(prompt: str, model_name: Optional[str] = None) -> str:
-    return generate_answer_with_meta(prompt, model_name=model_name)["answer"]
+def generate_answer(
+    prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
+) -> str:
+    return generate_answer_with_meta(prompt, model_name=model_name, temperature=temperature)["answer"]
 ```
 so existing callers that only need the answer text are unaffected.
 
 ---
 
 ### Step 4.5: Prompt Construction (In Pipeline)
-The prompt itself is built in `src/pipeline.py`, not in this module:
+The prompt itself is built in `src/pipeline.py`, not in this module, using a template file loaded
+via `src/prompt_loader.py` rather than an inline string:
 
 ```python
+from .prompt_loader import load_prompt_with_temperature
+
 context = "\n\n".join(chunks[i] for i in indices)
-prompt = f"Context:\n{context}\n\nQuestion: {question}\nAnswer concisely and list source chunk indices."
-ans = generate_answer(prompt)
+prompt, temperature = load_prompt_with_temperature("rag_prompt", context=context, question=question)
+ans = generate_answer(prompt, temperature=temperature)
 ```
 
-**Prompt Structure:**
+**Setting temperature per prompt:** add an optional `# temperature: <value>` line as the very
+first line of a prompt's `.txt` file. `load_prompt_with_temperature` strips this line before
+rendering the template (so it's never sent to the LLM) and returns it as the resolved temperature.
+If the line is absent, it falls back to `LLM_TEMPERATURE`, then `0.2` (see Step 4.1b). This is the
+intended way to tune temperature — edit the prompt file directly, no code or UI control needed.
+
+**Template file:** `prompts/rag_prompt.txt`
 ```
+# temperature: 0.2
+You are an AI assistant that answers questions using the provided document text.
+Context:
+{context}
+
+Question:
+{question}
+
+Provide a detailed, helpful answer grounded strictly in the document.
+If the document contains relevant information, explain it clearly and thoroughly.
+If the document does not contain the answer, say so explicitly.
+```
+
+The Direct LLM / Hybrid-fallback path (in `web_app.py`) uses a second template,
+`prompts/direct_llm_prompt.txt`, with its own `# temperature:` directive and `{document_text}` /
+`{question}` placeholders — it sends the whole document instead of retrieved chunks. Keeping both
+as separate `.txt` files under `prompts/` (rather than inline f-strings) makes them easy to find
+and edit — including their temperature — without touching Python code.
+
+**Prompt Structure (rendered — the `# temperature:` line is stripped before this is sent):**
+```
+You are an AI assistant that answers questions using the provided document text.
 Context:
 [Retrieved chunk 1]
 
@@ -159,8 +219,12 @@ Context:
 
 [Retrieved chunk 3]
 
-Question: [User question]
-Answer concisely and list source chunk indices.
+Question:
+[User question]
+
+Provide a detailed, helpful answer grounded strictly in the document.
+If the document contains relevant information, explain it clearly and thoroughly.
+If the document does not contain the answer, say so explicitly.
 ```
 
 ---
@@ -169,8 +233,8 @@ Answer concisely and list source chunk indices.
 **File:** `src/ai_query.py`
 
 **Functions:**
-- `generate_answer(prompt: str, model_name: Optional[str] = None) -> str`
-- `generate_answer_with_meta(prompt: str, model_name: Optional[str] = None) -> Dict[str, Any]`
+- `generate_answer(prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None) -> str`
+- `generate_answer_with_meta(prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None) -> Dict[str, Any]`
 - `_estimate_tokens(text: str) -> int` (internal, `len(text) // 4` heuristic)
 
 **Dependencies:**
@@ -187,6 +251,7 @@ Answer concisely and list source chunk indices.
 | API key | `LLM_API_KEY` | `OPENAI_API_KEY`, `XAI_API_KEY`, `GROK_API_KEY` |
 | Base URL | `LLM_API_BASE` | `OPENAI_API_BASE`, `XAI_API_BASE`, `GROK_API_BASE` (defaults to `https://api.openai.com/v1` if only `OPENAI_API_KEY` is set) |
 | Model name | `LLM_MODEL` | `OPENAI_MODEL`, `XAI_MODEL`, `GROK_MODEL` |
+| Temperature | `LLM_TEMPERATURE` | `temperature` argument takes precedence; defaults to `0.2` if neither is set |
 
 **LangSmith tracing variables (optional):**
 | Variable | Purpose |
@@ -427,7 +492,7 @@ providers is a configuration change, not a code change:
 ### Advanced Generation Control
 ```python
 # Could add:
-# - Configurable temperature and max token length
+# - Max token length control
 # - Streaming responses
-# - Prompt templates per document type
+# - Per-document-type prompt template selection
 ```

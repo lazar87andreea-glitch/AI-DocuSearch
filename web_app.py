@@ -17,6 +17,7 @@ load_dotenv()
 from src.ingest import extract_text
 from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
+from src.prompt_loader import load_prompt_with_temperature
 
 try:
     from langsmith import traceable
@@ -35,7 +36,8 @@ st.set_page_config(page_title="DocuSearch", layout="centered")
 st.title("DocuSearch")
 st.markdown(
     "Upload a document, ask a question, then run **RAG**, **Direct LLM**, and **Hybrid** "
-    "modes side by side and compare their speed, retrieval, and token usage."
+    "modes side by side. Metrics (speed, retrieval, token usage) are optional — click "
+    "**Show metrics** under any answer to reveal them."
 )
 
 
@@ -62,8 +64,8 @@ def run_rag(file_path: str, question: str) -> dict:
 
 @traceable(run_type="chain", name="web_app.direct_llm_mode")
 def run_direct(document_text: str, question: str) -> dict:
-    prompt = f"Document text:\n{document_text}\n\nQuestion: {question}\n\nAnswer based on the document above."
-    meta = generate_answer_with_meta(prompt)
+    prompt, temperature = load_prompt_with_temperature("direct_llm_prompt", document_text=document_text, question=question)
+    meta = generate_answer_with_meta(prompt, temperature=temperature)
     return {
         "query": question,
         "raw_answer": meta["answer"],
@@ -80,6 +82,7 @@ def run_direct(document_text: str, question: str) -> dict:
         "total_tokens": meta["total_tokens"],
         "estimated_tokens": meta["estimated_tokens"],
         "used_live_api": meta["used_live_api"],
+        "temperature": meta["temperature"],
         "fallback_reason": None,
     }
 
@@ -107,12 +110,30 @@ def render_metrics(result: dict):
         st.write(f"- Build/index time: {result['build_seconds']:.2f}s")
         st.write(f"- Retrieval time: {result['retrieval_seconds']:.2f}s")
         st.write(f"- Generation time: {result['generation_seconds']:.2f}s")
+        st.write(f"- Temperature: {result['temperature']}")
         st.write(f"- Prompt tokens: {result['prompt_tokens']:,}")
         st.write(f"- Completion tokens: {result['completion_tokens']:,}")
         st.write(f"- Live API used: {'Yes' if result['used_live_api'] else 'No (simulated fallback)'}")
         if result["lite_mode"]:
             reason = result.get("fallback_reason")
             st.write(f"- ⚠ Ran in lite/keyword-search mode{f' (fallback cause: {reason})' if reason else ''}")
+
+
+def render_result(mode_key: str, result: dict):
+    """Show the answer, then a toggle button that reveals metrics on demand."""
+    st.subheader("Answer")
+    st.write(result["raw_answer"])
+
+    show_flag = f"show_metrics_{mode_key}"
+    if show_flag not in st.session_state:
+        st.session_state[show_flag] = False
+
+    label = "📊 Hide metrics" if st.session_state[show_flag] else "📊 Show metrics"
+    if st.button(label, key=f"toggle_{show_flag}"):
+        st.session_state[show_flag] = not st.session_state[show_flag]
+
+    if st.session_state[show_flag]:
+        render_metrics(result)
 
 
 if "file_path" not in st.session_state:
@@ -169,10 +190,7 @@ with tab_rag:
             except Exception as e:
                 st.error(f"RAG mode failed: {type(e).__name__}: {e}")
     if "RAG" in st.session_state.results:
-        r = st.session_state.results["RAG"]
-        st.subheader("Answer")
-        st.write(r["raw_answer"])
-        render_metrics(r)
+        render_result("RAG", st.session_state.results["RAG"])
 
 with tab_direct:
     st.markdown(
@@ -183,10 +201,7 @@ with tab_direct:
         with st.spinner("Asking the LLM..."):
             st.session_state.results["Direct LLM"] = run_direct(st.session_state.document_text, question)
     if "Direct LLM" in st.session_state.results:
-        r = st.session_state.results["Direct LLM"]
-        st.subheader("Answer")
-        st.write(r["raw_answer"])
-        render_metrics(r)
+        render_result("Direct LLM", st.session_state.results["Direct LLM"])
 
 with tab_hybrid:
     st.markdown(
@@ -199,33 +214,38 @@ with tab_hybrid:
                 st.session_state.file_path, st.session_state.document_text, question
             )
     if "Hybrid" in st.session_state.results:
-        r = st.session_state.results["Hybrid"]
-        st.subheader("Answer")
-        st.write(r["raw_answer"])
-        render_metrics(r)
+        render_result("Hybrid", st.session_state.results["Hybrid"])
 
 if len(st.session_state.results) > 1:
     st.markdown("---")
-    st.subheader("Compare modes")
-    rows = []
-    for mode_name, r in st.session_state.results.items():
-        rows.append(
-            {
-                "Mode": mode_name,
-                "Total time (s)": round(r["total_seconds"], 2),
-                "Chunks used": r["chunk_count"],
-                "Context chars": r["context_chars"],
-                "Prompt tokens": r["prompt_tokens"],
-                "Completion tokens": r["completion_tokens"],
-                "Total tokens": r["total_tokens"],
-                "Tokens estimated?": "Yes" if r["estimated_tokens"] else "No",
-                "Live API": "Yes" if r["used_live_api"] else "No",
-            }
-        )
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+    if "show_comparison" not in st.session_state:
+        st.session_state.show_comparison = False
+    compare_label = "📊 Hide mode comparison" if st.session_state.show_comparison else "📊 Show mode comparison"
+    if st.button(compare_label, key="toggle_comparison"):
+        st.session_state.show_comparison = not st.session_state.show_comparison
 
-st.markdown("---")
-st.markdown(
-    "**Safe default**: RAG/Hybrid mode automatically falls back to lightweight keyword search "
-    "if embedding models can't be loaded, so the app never crashes the browser."
-)
+    if st.session_state.show_comparison:
+        st.subheader("Compare modes")
+        rows = []
+        for mode_name, r in st.session_state.results.items():
+            rows.append(
+                {
+                    "Mode": mode_name,
+                    "Total time (s)": round(r["total_seconds"], 2),
+                    "Chunks used": r["chunk_count"],
+                    "Context chars": r["context_chars"],
+                    "Temperature": r["temperature"],
+                    "Prompt tokens": r["prompt_tokens"],
+                    "Completion tokens": r["completion_tokens"],
+                    "Total tokens": r["total_tokens"],
+                    "Tokens estimated?": "Yes" if r["estimated_tokens"] else "No",
+                    "Live API": "Yes" if r["used_live_api"] else "No",
+                }
+            )
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+
+# st.markdown("---")
+# st.markdown(
+    # "**Safe default**: RAG/Hybrid mode automatically falls back to lightweight keyword search "
+    # "if embedding models can't be loaded, so the app never crashes the browser."
+# )

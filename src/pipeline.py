@@ -4,6 +4,7 @@ from .ingest import extract_text
 from .preprocess import clean_text, chunk_text
 from .embed_index import EmbedIndex
 from .ai_query import generate_answer_with_meta
+from .prompt_loader import load_prompt_with_temperature
 from typing import Dict, Any
 
 try:
@@ -121,7 +122,9 @@ def _lightweight_indices(chunks: list[str], question: str, top_k: int = 3) -> li
 
 
 @traceable(run_type="chain", name="answer_question")
-def answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> Dict[str, Any]:
+def answer_question(
+    pipeline: Dict[str, Any], question: str, top_k: int = 3, temperature: float | None = None
+) -> Dict[str, Any]:
     chunks = pipeline.get("chunks", [])
     retrieval_start = time.perf_counter()
     if pipeline.get("index") is None:
@@ -134,8 +137,8 @@ def answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> 
     retrieval_seconds = time.perf_counter() - retrieval_start
 
     context = "\n\n".join(chunks[i] for i in indices if i < len(chunks))
-    prompt = f"Context:\n{context}\n\nQuestion: {question}\nAnswer concisely and list source chunk indices."
-    meta = generate_answer_with_meta(prompt)
+    prompt, file_temperature = load_prompt_with_temperature("rag_prompt", context=context, question=question)
+    meta = generate_answer_with_meta(prompt, temperature=temperature if temperature is not None else file_temperature)
 
     return {
         "query": question,
@@ -152,6 +155,7 @@ def answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> 
         "total_tokens": meta["total_tokens"],
         "estimated_tokens": meta["estimated_tokens"],
         "used_live_api": meta["used_live_api"],
+        "temperature": meta["temperature"],
     }
 
 

@@ -23,9 +23,16 @@ def _estimate_tokens(text: str) -> int:
 
 
 @traceable(run_type="llm", name="generate_answer")
-def generate_answer_with_meta(prompt: str, model_name: Optional[str] = None) -> Dict[str, Any]:
+def generate_answer_with_meta(
+    prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
+) -> Dict[str, Any]:
     """Same resolution/request logic as generate_answer, plus timing and token metrics."""
     start = time.perf_counter()
+
+    resolved_temperature = temperature
+    if resolved_temperature is None:
+        env_temp = os.getenv("LLM_TEMPERATURE")
+        resolved_temperature = float(env_temp) if env_temp else 0.2
 
     # Generic LLM_* variables are the recommended way to configure any OpenAI-compatible
     # chat completions provider (OpenAI, xAI/Grok, Groq, Together, etc.). OPENAI_* and the
@@ -56,6 +63,7 @@ def generate_answer_with_meta(prompt: str, model_name: Optional[str] = None) -> 
     print(f"[AI_QUERY] API Key present: {bool(api_key)}", file=sys.stderr)
     print(f"[AI_QUERY] Base URL: {base_url}", file=sys.stderr)
     print(f"[AI_QUERY] Model: {resolved_model}", file=sys.stderr)
+    print(f"[AI_QUERY] Temperature: {resolved_temperature}", file=sys.stderr)
 
     if api_key and base_url and resolved_model:
         try:
@@ -64,7 +72,7 @@ def generate_answer_with_meta(prompt: str, model_name: Optional[str] = None) -> 
             payload = {
                 "model": resolved_model,
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2,
+                "temperature": resolved_temperature,
             }
             headers = {
                 "Authorization": f"Bearer {api_key}",
@@ -103,6 +111,7 @@ def generate_answer_with_meta(prompt: str, model_name: Optional[str] = None) -> 
                 "completion_tokens": completion_tokens,
                 "total_tokens": total_tokens,
                 "estimated_tokens": estimated,
+                "temperature": resolved_temperature,
             }
         except Exception as e:
             print(f"[AI_QUERY] ERROR: {type(e).__name__}: {e}", file=sys.stderr)
@@ -123,11 +132,14 @@ def generate_answer_with_meta(prompt: str, model_name: Optional[str] = None) -> 
         "completion_tokens": completion_tokens,
         "total_tokens": prompt_tokens + completion_tokens,
         "estimated_tokens": True,
+        "temperature": resolved_temperature,
     }
 
 
-def generate_answer(prompt: str, model_name: Optional[str] = None) -> str:
-    return generate_answer_with_meta(prompt, model_name=model_name)["answer"]
+def generate_answer(
+    prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
+) -> str:
+    return generate_answer_with_meta(prompt, model_name=model_name, temperature=temperature)["answer"]
 
 
 if __name__ == "__main__":

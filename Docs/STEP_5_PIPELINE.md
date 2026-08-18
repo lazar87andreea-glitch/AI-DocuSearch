@@ -72,6 +72,7 @@ from .ingest import extract_text
 from .preprocess import clean_text, chunk_text
 from .embed_index import EmbedIndex
 from .ai_query import generate_answer_with_meta
+from .prompt_loader import load_prompt_with_temperature
 from typing import Dict, Any
 import os
 import time
@@ -129,7 +130,9 @@ semantic search — see `_lightweight_indices` below.
 
 ### Step 5.2: Answer Question
 ```python
-def answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> Dict[str, Any]:
+def answer_question(
+    pipeline: Dict[str, Any], question: str, top_k: int = 3, temperature: float | None = None
+) -> Dict[str, Any]:
 ```
 
 **Process:**
@@ -145,21 +148,32 @@ def answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> 
    - Join with double newlines for clarity
 
 3. **Build Prompt (Step 4)**
-   - Combine context with question and instructions for answer format
+   - Load `prompts/rag_prompt.txt` via
+     `load_prompt_with_temperature("rag_prompt", context=context, question=question)` from
+     `src/prompt_loader.py`, which returns both the rendered prompt and the temperature to use for
+     this call — resolved from a `# temperature: <value>` directive on the prompt file's first
+     line, or `LLM_TEMPERATURE`, or `0.2` if neither is set. The `temperature` argument to
+     `answer_question` is an optional override that takes precedence over the file/env value when
+     explicitly passed (e.g. for tests or CLI use); the unified web app doesn't pass one, so the
+     prompt file's directive is what controls it there.
 
 4. **Generate Answer (Step 4, timed and with token metrics)**
-   - Call `generate_answer_with_meta(prompt)` — live call to the configured LLM provider, or
-     simulated fallback — returning the answer plus `elapsed_seconds`, token counts, and whether
-     the tokens are estimated or came from the provider's real `usage` field.
+   - Call `generate_answer_with_meta(prompt, temperature=resolved_temperature)` — live call to the
+     configured LLM provider, or simulated fallback — returning the answer plus `elapsed_seconds`,
+     token counts, the temperature actually used, and whether the tokens are estimated or came
+     from the provider's real `usage` field.
 
 5. **Format Results**
    - Return dictionary with `query`, `raw_answer`, `source_chunks`, `lite_mode`, plus metrics:
      `retrieval_seconds`, `generation_seconds`, `total_seconds`, `chunk_count`, `context_chars`,
-     `prompt_tokens`, `completion_tokens`, `total_tokens`, `estimated_tokens`, `used_live_api`
+     `prompt_tokens`, `completion_tokens`, `total_tokens`, `estimated_tokens`, `used_live_api`,
+     `temperature`
 
 **Implementation:**
 ```python
-def answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> Dict[str, Any]:
+def answer_question(
+    pipeline: Dict[str, Any], question: str, top_k: int = 3, temperature: float | None = None
+) -> Dict[str, Any]:
     chunks = pipeline.get("chunks", [])
     retrieval_start = time.perf_counter()
     if pipeline.get("index") is None:
@@ -172,8 +186,8 @@ def answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> 
     retrieval_seconds = time.perf_counter() - retrieval_start
 
     context = "\n\n".join(chunks[i] for i in indices if i < len(chunks))
-    prompt = f"Context:\n{context}\n\nQuestion: {question}\nAnswer concisely and list source chunk indices."
-    meta = generate_answer_with_meta(prompt)
+    prompt, file_temperature = load_prompt_with_temperature("rag_prompt", context=context, question=question)
+    meta = generate_answer_with_meta(prompt, temperature=temperature if temperature is not None else file_temperature)
 
     return {
         "query": question,
@@ -190,6 +204,7 @@ def answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> 
         "total_tokens": meta["total_tokens"],
         "estimated_tokens": meta["estimated_tokens"],
         "used_live_api": meta["used_live_api"],
+        "temperature": meta["temperature"],
     }
 ```
 
@@ -213,7 +228,8 @@ print(result)
 #     "completion_tokens": 48,
 #     "total_tokens": 258,
 #     "estimated_tokens": False,
-#     "used_live_api": True
+#     "used_live_api": True,
+#     "temperature": 0.2
 # }
 ```
 
@@ -270,7 +286,7 @@ answer_question(pipeline, question, top_k=10)
 
 **Functions:**
 - `build_pipeline(file_path: str, use_embeddings: bool | None = None) -> Dict[str, Any]`
-- `answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3) -> Dict[str, Any]`
+- `answer_question(pipeline: Dict[str, Any], question: str, top_k: int = 3, temperature: float | None = None) -> Dict[str, Any]`
 - `_lightweight_indices(chunks: list[str], question: str, top_k: int = 3) -> list[int]` (internal, lite-mode retrieval)
 - `_available_memory_gb() -> float` (internal, Windows-only memory check)
 
@@ -280,6 +296,7 @@ from .ingest import extract_text
 from .preprocess import clean_text, chunk_text
 from .embed_index import EmbedIndex
 from .ai_query import generate_answer_with_meta
+from .prompt_loader import load_prompt_with_temperature
 from typing import Dict, Any
 import time
 ```
@@ -289,6 +306,8 @@ import time
 
 **Dependencies:**
 - All previous steps (ingest, preprocess, embed_index, ai_query)
+- `src/prompt_loader.py` — loads `prompts/rag_prompt.txt` and resolves its `# temperature:`
+  directive for `answer_question`'s prompt (see Step 4.5 in `STEP_4_AI_QUERY.md`)
 - `langsmith` (optional) — if installed and `LANGSMITH_TRACING=true`, `build_pipeline` and
   `answer_question` are each wrapped in `@traceable(run_type="chain", ...)`, so a call to
   `answer_question` shows up nested under `build_pipeline` (and under `generate_answer`, from

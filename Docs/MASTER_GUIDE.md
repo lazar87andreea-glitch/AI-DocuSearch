@@ -63,7 +63,11 @@ AI DocuSearch/
 │   ├── embed_index.py
 │   ├── ingest.py
 │   ├── pipeline.py
-│   └── preprocess.py
+│   ├── preprocess.py
+│   └── prompt_loader.py
+├── prompts/
+│   ├── rag_prompt.txt
+│   └── direct_llm_prompt.txt
 ├── Docs/
 │   ├── MASTER_GUIDE.md
 │   ├── STEP_1_INGEST.md
@@ -126,10 +130,11 @@ python -m streamlit run web_app.py
 ```
 
 After uploading a document and entering a question, use the **RAG Mode**, **Direct LLM Mode**, and
-**Hybrid Mode** tabs to run and compare each approach. Every run reports total time, a build/
-retrieval/generation time breakdown, chunk count, context size, and prompt/completion/total token
-counts (real `usage` data from the provider when available, otherwise an estimate). A comparison
-table appears once two or more modes have been run.
+**Hybrid Mode** tabs to run and compare each approach. Each answer has a **📊 Show metrics** button
+underneath (hidden by default) that reveals total time, a build/retrieval/generation time
+breakdown, chunk count, context size, and prompt/completion/total token counts (real `usage` data
+from the provider when available, otherwise an estimate). A **📊 Show mode comparison** button
+appears once two or more modes have been run, revealing a side-by-side table.
 
 ## Example usage
 
@@ -167,6 +172,15 @@ token counts (used by the web app's per-mode metrics).
 Responsible for coordinating the whole flow and deciding whether to use the full RAG path or the
 fallback path. `answer_question()` returns timing (retrieval/generation/total seconds), chunk
 count, context size, and token metrics alongside the answer.
+
+### `src/prompt_loader.py`
+Responsible for loading prompt templates from the `prompts/` folder and filling in their
+`{placeholder}` fields via `load_prompt(name, **kwargs)`. Keeping prompts as separate `.txt` files
+(`prompts/rag_prompt.txt`, `prompts/direct_llm_prompt.txt`) instead of inline strings makes them
+easy to find and edit without touching Python code. Each file may start with an optional
+`# temperature: <value>` directive line — `load_prompt_with_temperature()` reads and strips it,
+falling back to `LLM_TEMPERATURE`, then `0.2`, if absent. This is the intended way to tune
+temperature per prompt; there is no runtime/UI control for it.
 
 ## Design notes for GitHub publication
 
