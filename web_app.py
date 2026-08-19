@@ -77,6 +77,18 @@ try:
         print(f"[DEBUG] LangSmith connected successfully. Found {len(projects)} projects.", file=sys.stderr)
         for proj in projects[:3]:  # Show first 3
             print(f"[DEBUG]   - {proj.name}", file=sys.stderr)
+        
+        # Check which project the client will write to
+        client_project = os.environ.get('LANGSMITH_PROJECT', 'default')
+        print(f"[DEBUG] Client configured to write to project: '{client_project}'", file=sys.stderr)
+        
+        # Verify this project exists
+        project_names = [p.name for p in projects]
+        if client_project in project_names:
+            print(f"[DEBUG] ✓ Project '{client_project}' exists", file=sys.stderr)
+        else:
+            print(f"[DEBUG] ✗ Project '{client_project}' NOT found. Available: {project_names}", file=sys.stderr)
+            
     except Exception as conn_err:
         print(f"[DEBUG] LangSmith client created but connection test failed: {conn_err}", file=sys.stderr)
     
@@ -88,6 +100,13 @@ try:
     try:
         result = _test_langsmith_trace()
         print(f"[DEBUG] ✓ Test trace created: {result}", file=sys.stderr)
+        
+        # Force flush any pending traces
+        try:
+            _langsmith_client._sync_client.api_key  # Access to trigger any lazy initialization
+            print(f"[DEBUG] Trace flushed to LangSmith", file=sys.stderr)
+        except:
+            pass
     except Exception as test_err:
         print(f"[DEBUG] ✗ Test trace failed: {test_err}", file=sys.stderr)
         
