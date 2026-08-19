@@ -13,6 +13,8 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 import streamlit as st
 from dotenv import load_dotenv
 
+from src.history_manager import HistoryManager
+
 load_dotenv()
 
 # Initialize LangSmith with Streamlit's caching model
@@ -99,6 +101,20 @@ def verify_langsmith_config():
 _langsmith_config = verify_langsmith_config()
 
 st.set_page_config(page_title="DocuSearch", layout="wide")
+
+# Initialize history manager for this session
+if "history_manager" not in st.session_state:
+    session_id = str(hash((st.session_state.session_id if hasattr(st.session_state, 'session_id') else id(st.session_state))) % (10 ** 8))
+    st.session_state.history_manager = HistoryManager(session_id)
+
+# Run cleanup on every app load (targets old sessions, doesn't affect current one)
+history_enabled = os.getenv("HISTORY_ENABLED", "true").lower() in ("true", "1", "yes")
+if history_enabled:
+    try:
+        retention_days = int(os.getenv("HISTORY_RETENTION_DAYS", "30"))
+        HistoryManager.cleanup_old_sessions(retention_days=retention_days)
+    except Exception:
+        pass
 
 # Check if on mobile
 is_mobile = is_mobile_browser()
@@ -219,6 +235,70 @@ def render_result(mode_key: str, result: dict):
         render_metrics(result)
 
 
+def log_to_history(mode: str, question: str, result: dict, document_name: str) -> None:
+    """Log a query to history after it completes."""
+    if not history_enabled or not st.session_state.history_manager:
+        return
+    
+    try:
+        # Extract metrics from result
+        metrics_dict = {
+            "total_seconds": result.get("total_seconds", 0),
+            "retrieval_seconds": result.get("retrieval_seconds", 0),
+            "generation_seconds": result.get("generation_seconds", 0),
+            "chunk_count": result.get("chunk_count", 0),
+            "prompt_tokens": result.get("prompt_tokens", 0),
+            "completion_tokens": result.get("completion_tokens", 0),
+            "total_tokens": result.get("total_tokens", 0),
+            "temperature": result.get("temperature", 0.2),
+        }
+        
+        # Log to history
+        st.session_state.history_manager.add_question(
+            question=question,
+            answer=result.get("raw_answer", ""),
+            mode=mode,
+            metrics_dict=metrics_dict,
+            document_name=document_name
+        )
+    except Exception as e:
+        print(f"[HISTORY] Failed to log question: {e}", file=sys.stderr)
+
+
+def render_history_sidebar() -> None:
+    """Display recent questions for current document in sidebar."""
+    if not history_enabled or not st.session_state.history_manager:
+        return
+    
+    current_doc = st.session_state.get("uploaded_name", None)
+    if not current_doc:
+        return
+    
+    history_limit = int(os.getenv("HISTORY_LIMIT", "10"))
+    recent = st.session_state.history_manager.get_recent_questions(
+        document_name=current_doc,
+        limit=history_limit
+    )
+    
+    if not recent:
+        return
+    
+    st.sidebar.markdown("### 📋 Session History")
+    
+    for i, entry in enumerate(recent):
+        timestamp = entry.get("timestamp", "")[:16]  # YYYY-MM-DD HH:MM
+        mode = entry.get("mode", "")
+        question = entry.get("question", "")[:40]
+        if len(entry.get("question", "")) > 40:
+            question += "..."
+        
+        # Create a button to load this question
+        btn_label = f"[{mode}] {timestamp}\n{question}"
+        if st.sidebar.button(btn_label, key=f"history_btn_{i}", use_container_width=True):
+            st.session_state.last_question = entry.get("question", "")
+            st.rerun()
+
+
 if "file_path" not in st.session_state:
     st.session_state.file_path = None
 if "document_text" not in st.session_state:
@@ -278,6 +358,9 @@ else:
     if "uploaded_name" not in st.session_state:
         st.info("👆 Please upload a document to get started")
 
+# Render history sidebar
+render_history_sidebar()
+
 question = st.text_input("Ask a question about the document")
 if question != st.session_state.last_question:
     st.session_state.last_question = question
@@ -299,6 +382,8 @@ if is_mobile:
         try:
             result = run_direct(st.session_state.document_text, question)
             st.session_state.results["Direct LLM"] = result
+            # Log to history
+            log_to_history("Direct LLM", question, result, st.session_state.get("uploaded_name", "unknown"))
             st.success("✅ Query completed!")
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
@@ -323,6 +408,8 @@ else:
             try:
                 result = run_rag(st.session_state.file_path, question)
                 st.session_state.results["RAG"] = result
+                # Log to history
+                log_to_history("RAG", question, result, st.session_state.get("uploaded_name", "unknown"))
                 st.success("✅ RAG completed!")
             except Exception as e:
                 error_msg = f"{type(e).__name__}: {str(e)}"
@@ -343,6 +430,8 @@ else:
             try:
                 result = run_direct(st.session_state.document_text, question)
                 st.session_state.results["Direct LLM"] = result
+                # Log to history
+                log_to_history("Direct LLM", question, result, st.session_state.get("uploaded_name", "unknown"))
                 st.success("✅ Query completed!")
             except Exception as e:
                 error_msg = f"{type(e).__name__}: {str(e)}"
@@ -366,6 +455,8 @@ else:
                     st.session_state.file_path, st.session_state.document_text, question
                 )
                 st.session_state.results["Hybrid"] = result
+                # Log to history
+                log_to_history("Hybrid", question, result, st.session_state.get("uploaded_name", "unknown"))
                 st.success("✅ Hybrid completed!")
             except Exception as e:
                 error_msg = f"{type(e).__name__}: {str(e)}"
