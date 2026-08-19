@@ -123,15 +123,16 @@ HISTORY_LIMIT = "10"
    - Select a test document
    - Wait for extraction (green ✅ message)
 
-2. **Ask a question**
-   - Type a question in the text box
-   - On desktop: Choose "Direct LLM", "RAG", or "Hybrid" mode
-   - On mobile: Only "Direct LLM" is available
-   - Click "Run [Mode]"
+2. **Chat with the document**
+   - Select a mode: **Direct LLM** (fastest, all devices), **RAG** (most accurate, desktop only), or **Hybrid** (tries RAG, falls back to Direct LLM)
+   - Type your question in the chat input box
+   - Press Enter or click the input box to submit
+   - Answer appears in the conversation thread below
 
-3. **Check result**
-   - Answer should appear after 10-60 seconds
-   - Click "📊 Show metrics" to see performance details
+3. **View conversation history**
+   - Previous questions and answers appear above the chat input
+   - Click "📊 Metrics" on any response to see performance details (response time, tokens, etc.)
+   - History persists for the current browser session
 
 ### 4.2: Test LangSmith Integration (Optional)
 
@@ -141,7 +142,7 @@ Run `test_langsmith.py` locally to verify credentials:
 python test_langsmith.py
 ```
 
-Then in the deployed app, run a query. Check your [LangSmith dashboard](https://smith.langchain.com) for traces.
+Then in the deployed app, ask a question. Check your [LangSmith dashboard](https://smith.langchain.com) for traces.
 
 ## Step 5: Features & Capabilities
 
@@ -157,15 +158,17 @@ Then in the deployed app, run a query. Check your [LangSmith dashboard](https://
 ### Device Support
 
 - **Desktop browsers** (Chrome, Firefox, Safari, Edge)
-  - ✅ All three modes (RAG, Direct LLM, Hybrid)
-  - ✅ Full metrics and comparison tables
-  - ✅ 4-column metric layout
+  - ✅ Chat interface with all three modes (RAG, Direct LLM, Hybrid)
+  - ✅ Conversation history with timestamps
+  - ✅ Expandable metrics for each response
+  - ✅ Wide layout for readability
 
 - **Mobile browsers** (Android, iOS)
-  - ✅ Responsive single-column layout
-  - ✅ Direct LLM mode optimized
-  - ⚠️ RAG/Hybrid disabled (resource limits)
-  - ✅ Touch-friendly buttons
+  - ✅ Same chat interface as desktop
+  - ✅ Direct LLM mode (recommended for mobile performance)
+  - ℹ️ RAG/Hybrid modes available but not recommended (uses more resources)
+  - ✅ Touch-friendly chat input
+  - ✅ Responsive vertical layout
 
 ### Performance Notes
 
