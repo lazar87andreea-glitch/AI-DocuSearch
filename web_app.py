@@ -70,7 +70,15 @@ from src.prompt_loader import load_prompt_with_temperature
 try:
     from langsmith import Client
     _langsmith_client = Client()
-    print(f"[DEBUG] LangSmith client initialized - tracing active", file=sys.stderr)
+    
+    # Test connectivity by fetching projects
+    try:
+        projects = list(_langsmith_client.list_projects())
+        print(f"[DEBUG] LangSmith connected successfully. Found {len(projects)} projects.", file=sys.stderr)
+        for proj in projects[:3]:  # Show first 3
+            print(f"[DEBUG]   - {proj.name}", file=sys.stderr)
+    except Exception as conn_err:
+        print(f"[DEBUG] LangSmith client created but connection test failed: {conn_err}", file=sys.stderr)
 except Exception as e:
     print(f"[DEBUG] Could not initialize LangSmith client: {e}", file=sys.stderr)
 

@@ -31,6 +31,7 @@ def generate_answer_with_meta(
     prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
 ) -> Dict[str, Any]:
     """Same resolution/request logic as generate_answer, plus timing and token metrics."""
+    print(f"[LANGSMITH] @traceable: generate_answer_with_meta called", file=sys.stderr)
     start = time.perf_counter()
 
     resolved_temperature = temperature
