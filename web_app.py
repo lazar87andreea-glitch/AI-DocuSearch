@@ -21,16 +21,22 @@ def _initialize_langsmith():
     """Initialize LangSmith client once per Streamlit session (survives reruns)."""
     print("[DEBUG] Initializing LangSmith...", file=sys.stderr)
     
-    # Set env vars from Streamlit secrets
-    if hasattr(st, 'secrets') and 'LANGSMITH_API_KEY' in st.secrets:
-        os.environ['LANGSMITH_API_KEY'] = st.secrets['LANGSMITH_API_KEY']
-        print("[DEBUG] LANGSMITH_API_KEY loaded from secrets", file=sys.stderr)
-    if hasattr(st, 'secrets') and 'LANGSMITH_TRACING' in st.secrets:
-        os.environ['LANGSMITH_TRACING'] = st.secrets['LANGSMITH_TRACING']
-        print(f"[DEBUG] LANGSMITH_TRACING={os.environ.get('LANGSMITH_TRACING')}", file=sys.stderr)
-    if hasattr(st, 'secrets') and 'LANGSMITH_PROJECT' in st.secrets:
-        os.environ['LANGSMITH_PROJECT'] = st.secrets['LANGSMITH_PROJECT']
-        print(f"[DEBUG] LANGSMITH_PROJECT={os.environ.get('LANGSMITH_PROJECT')}", file=sys.stderr)
+    # Set env vars from Streamlit secrets (ensure they're strings)
+    try:
+        if hasattr(st, 'secrets') and 'LANGSMITH_API_KEY' in st.secrets:
+            api_key = st.secrets['LANGSMITH_API_KEY']
+            os.environ['LANGSMITH_API_KEY'] = str(api_key) if api_key else ""
+            print("[DEBUG] LANGSMITH_API_KEY loaded from secrets", file=sys.stderr)
+        if hasattr(st, 'secrets') and 'LANGSMITH_TRACING' in st.secrets:
+            tracing = st.secrets['LANGSMITH_TRACING']
+            os.environ['LANGSMITH_TRACING'] = str(tracing) if tracing else "false"
+            print(f"[DEBUG] LANGSMITH_TRACING={os.environ.get('LANGSMITH_TRACING')}", file=sys.stderr)
+        if hasattr(st, 'secrets') and 'LANGSMITH_PROJECT' in st.secrets:
+            project = st.secrets['LANGSMITH_PROJECT']
+            os.environ['LANGSMITH_PROJECT'] = str(project) if project else "default"
+            print(f"[DEBUG] LANGSMITH_PROJECT={os.environ.get('LANGSMITH_PROJECT')}", file=sys.stderr)
+    except Exception as e:
+        print(f"[DEBUG] Error setting env vars: {e}", file=sys.stderr)
     
     # Now import langsmith with environment properly configured
     try:
