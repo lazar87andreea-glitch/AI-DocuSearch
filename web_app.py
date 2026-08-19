@@ -19,8 +19,6 @@ load_dotenv()
 @st.cache_resource
 def _initialize_langsmith():
     """Initialize LangSmith client once per Streamlit session (survives reruns)."""
-    print("[DEBUG] Initializing LangSmith...", file=sys.stderr)
-    
     def _to_env_string(value):
         """Convert any value to a proper environment variable string."""
         if isinstance(value, bool):
@@ -33,18 +31,14 @@ def _initialize_langsmith():
             for key, value in st.secrets.items():
                 converted = _to_env_string(value)
                 os.environ[key] = converted
-                if 'LANGSMITH' in key or 'LLM' in key:
-                    print(f"[DEBUG] {key}: {type(value).__name__}={repr(value)} -> {repr(converted)}", file=sys.stderr)
-    except Exception as e:
-        print(f"[DEBUG] Error loading secrets: {e}", file=sys.stderr)
+    except Exception:
+        pass
     
     # Now import langsmith with environment properly configured
     try:
         from langsmith import traceable as _langsmith_traceable
-        print("[DEBUG] ✓ LangSmith import successful", file=sys.stderr)
         return _langsmith_traceable
-    except Exception as e:
-        print(f"[DEBUG] ✗ LangSmith import failed: {e}", file=sys.stderr)
+    except Exception:
         # Return no-op decorator as fallback
         from typing import Callable, TypeVar
         _F = TypeVar("_F", bound=Callable[..., object])
@@ -58,60 +52,18 @@ def _initialize_langsmith():
 # Initialize LangSmith (cached per session, survives reruns)
 traceable = _initialize_langsmith()
 
-print("[DEBUG] Importing src modules...", file=sys.stderr)
-
 # NOW import src modules (they will use traceable decorator with env vars set)
 from src.ingest import extract_text
 from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
 from src.prompt_loader import load_prompt_with_temperature
 
-# Force LangSmith client initialization to ensure tracing is active
+# Initialize LangSmith client for manual tracing
 try:
-    from langsmith import Client, traceable as _traced_decorator
+    from langsmith import Client
     _langsmith_client = Client()
-    
-    # Test connectivity by fetching projects
-    try:
-        projects = list(_langsmith_client.list_projects())
-        print(f"[DEBUG] LangSmith connected successfully. Found {len(projects)} projects.", file=sys.stderr)
-        for proj in projects[:3]:  # Show first 3
-            print(f"[DEBUG]   - {proj.name}", file=sys.stderr)
-        
-        # Check which project the client will write to
-        client_project = os.environ.get('LANGSMITH_PROJECT', 'default')
-        print(f"[DEBUG] Client configured to write to project: '{client_project}'", file=sys.stderr)
-        
-        # Verify this project exists
-        project_names = [p.name for p in projects]
-        if client_project in project_names:
-            print(f"[DEBUG] ✓ Project '{client_project}' exists", file=sys.stderr)
-        else:
-            print(f"[DEBUG] ✗ Project '{client_project}' NOT found. Available: {project_names}", file=sys.stderr)
-            
-    except Exception as conn_err:
-        print(f"[DEBUG] LangSmith client created but connection test failed: {conn_err}", file=sys.stderr)
-    
-    # Create a test trace to verify decorator works
-    @_traced_decorator(run_type="tool", name="langsmith_connectivity_test")
-    def _test_langsmith_trace():
-        return "test trace created"
-    
-    try:
-        result = _test_langsmith_trace()
-        print(f"[DEBUG] ✓ Test trace created: {result}", file=sys.stderr)
-        
-        # Force flush any pending traces
-        try:
-            _langsmith_client._sync_client.api_key  # Access to trigger any lazy initialization
-            print(f"[DEBUG] Trace flushed to LangSmith", file=sys.stderr)
-        except:
-            pass
-    except Exception as test_err:
-        print(f"[DEBUG] ✗ Test trace failed: {test_err}", file=sys.stderr)
-        
-except Exception as e:
-    print(f"[DEBUG] Could not initialize LangSmith client: {e}", file=sys.stderr)
+except Exception:
+    _langsmith_client = None
 
 # Mobile detection helper
 def is_mobile_browser():
@@ -134,8 +86,6 @@ def verify_langsmith_config():
     tracing = os.environ.get('LANGSMITH_TRACING')
     project = os.environ.get('LANGSMITH_PROJECT')
     
-    print(f"[DEBUG] Verifying config: LANGSMITH_TRACING={repr(tracing)} (type: {type(tracing).__name__}, len: {len(tracing) if tracing else 0})", file=sys.stderr)
-    
     is_configured = bool(api_key and tracing == 'true')
     
     return {
@@ -147,7 +97,6 @@ def verify_langsmith_config():
 
 # Check config on startup (cached, runs once per session)
 _langsmith_config = verify_langsmith_config()
-print(f"[DEBUG] LangSmith Config: {_langsmith_config}", file=sys.stderr)
 
 st.set_page_config(page_title="DocuSearch", layout="wide")
 

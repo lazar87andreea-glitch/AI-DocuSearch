@@ -31,7 +31,6 @@ def generate_answer_with_meta(
     prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
 ) -> Dict[str, Any]:
     """Same resolution/request logic as generate_answer, plus timing and token metrics."""
-    print(f"[LANGSMITH] @traceable: generate_answer_with_meta called", file=sys.stderr)
     start = time.perf_counter()
 
     resolved_temperature = temperature
@@ -75,20 +74,17 @@ def generate_answer_with_meta(
             import requests
             
             # Wrap the LLM API call in a LangSmith trace
+            run = None
             try:
                 from langsmith import Client
                 _ls_client = Client()
-                
-                # Create a run for this LLM call
                 run = _ls_client.create_run(
                     name="generate_answer",
                     run_type="llm",
                     inputs={"prompt": prompt},
                 )
-                print(f"[LANGSMITH] Created run: {run.id}", file=sys.stderr)
-            except Exception as ls_err:
-                print(f"[LANGSMITH] Could not create LangSmith run: {ls_err}", file=sys.stderr)
-                run = None
+            except Exception:
+                pass
 
             payload = {
                 "model": resolved_model,
@@ -116,9 +112,8 @@ def generate_answer_with_meta(
             if run:
                 try:
                     _ls_client.end_run(run.id, outputs={"answer": answer})
-                    print(f"[LANGSMITH] Ended run successfully: {run.id}", file=sys.stderr)
-                except Exception as end_err:
-                    print(f"[LANGSMITH] Could not end LangSmith run: {end_err}", file=sys.stderr)
+                except Exception:
+                    pass
 
             usage = data.get("usage") or {}
             prompt_tokens = usage.get("prompt_tokens")
@@ -151,9 +146,8 @@ def generate_answer_with_meta(
             if 'run' in locals() and run:
                 try:
                     _ls_client.end_run(run.id, error=str(e))
-                    print(f"[LANGSMITH] Ended run with error: {run.id}", file=sys.stderr)
-                except Exception as end_err:
-                    print(f"[LANGSMITH] Could not end LangSmith run: {end_err}", file=sys.stderr)
+                except Exception:
+                    pass
     else:
         print(f"[AI_QUERY] MISSING CONFIG: api_key={bool(api_key)}, base_url={bool(base_url)}, model={bool(resolved_model)}", file=sys.stderr)
 

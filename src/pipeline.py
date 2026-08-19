@@ -25,7 +25,6 @@ except Exception:
 @traceable(run_type="chain", name="build_pipeline")
 def build_pipeline(file_path: str, use_embeddings: bool | None = None) -> Dict[str, Any]:
     import sys
-    print(f"[LANGSMITH] @traceable: build_pipeline called", file=sys.stderr)
     print(f"[PIPELINE] Starting build_pipeline for {file_path}", file=sys.stderr)
     
     print(f"[PIPELINE] Extracting text...", file=sys.stderr)
@@ -127,8 +126,6 @@ def _lightweight_indices(chunks: list[str], question: str, top_k: int = 3) -> li
 def answer_question(
     pipeline: Dict[str, Any], question: str, top_k: int = 3, temperature: float | None = None
 ) -> Dict[str, Any]:
-    import sys
-    print(f"[LANGSMITH] @traceable: answer_question called", file=sys.stderr)
     chunks = pipeline.get("chunks", [])
     retrieval_start = time.perf_counter()
     if pipeline.get("index") is None:
