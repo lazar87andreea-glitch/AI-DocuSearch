@@ -27,23 +27,14 @@ def _initialize_langsmith():
             return "true" if value else "false"
         return str(value) if value else ""
     
-    # Set env vars from Streamlit secrets (ensure they're strings with proper format)
+    # Load ALL secrets from Streamlit into os.environ (both LLM and LangSmith)
     try:
-        if hasattr(st, 'secrets') and 'LANGSMITH_API_KEY' in st.secrets:
-            api_key = st.secrets['LANGSMITH_API_KEY']
-            os.environ['LANGSMITH_API_KEY'] = _to_env_string(api_key)
-            print("[DEBUG] LANGSMITH_API_KEY loaded from secrets", file=sys.stderr)
-        if hasattr(st, 'secrets') and 'LANGSMITH_TRACING' in st.secrets:
-            tracing = st.secrets['LANGSMITH_TRACING']
-            tracing_str = _to_env_string(tracing)
-            os.environ['LANGSMITH_TRACING'] = tracing_str
-            print(f"[DEBUG] LANGSMITH_TRACING={tracing_str} (was {type(tracing).__name__}: {tracing})", file=sys.stderr)
-        if hasattr(st, 'secrets') and 'LANGSMITH_PROJECT' in st.secrets:
-            project = st.secrets['LANGSMITH_PROJECT']
-            os.environ['LANGSMITH_PROJECT'] = _to_env_string(project)
-            print(f"[DEBUG] LANGSMITH_PROJECT={os.environ.get('LANGSMITH_PROJECT')}", file=sys.stderr)
+        if hasattr(st, 'secrets'):
+            for key, value in st.secrets.items():
+                os.environ[key] = _to_env_string(value)
+                print(f"[DEBUG] Loaded secret: {key}", file=sys.stderr)
     except Exception as e:
-        print(f"[DEBUG] Error setting env vars: {e}", file=sys.stderr)
+        print(f"[DEBUG] Error loading secrets: {e}", file=sys.stderr)
     
     # Now import langsmith with environment properly configured
     try:
