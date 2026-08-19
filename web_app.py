@@ -273,7 +273,7 @@ def render_history_sidebar() -> None:
 
 
 def render_chat_history() -> None:
-    """Display conversation history as a chat interface."""
+    """Display conversation history as a clean chat interface with responsive margins."""
     if not history_enabled or not st.session_state.history_manager:
         return
     
@@ -292,40 +292,130 @@ def render_chat_history() -> None:
         return
     
     # Display conversation (reverse order so newest is at bottom)
-    st.markdown("### 💬 Conversation History")
+    st.markdown("### 💬 Conversation")
     
-    for i, entry in enumerate(reversed(recent)):
+    # Responsive chat container with margins
+    st.markdown("""
+    <style>
+        .chat-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 12px;
+        }
+        .chat-bubble-user {
+            background-color: #e3f2fd;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 4px solid #2196f3;
+            margin-right: 40px;
+        }
+        .chat-bubble-bot {
+            background-color: #e8f5e9;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 4px solid #4caf50;
+            margin-left: 40px;
+        }
+        .chat-timestamp {
+            font-size: 0.8em;
+            color: #666;
+        }
+        .chat-mode-badge {
+            display: inline-block;
+            background-color: #f0f0f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 4px;
+        }
+    </style>
+    <div class="chat-container">
+    """, unsafe_allow_html=True)
+    
+    # Display each conversation turn
+    for entry in reversed(recent):
         timestamp = entry.get("timestamp", "")[:16]
         mode = entry.get("mode", "")
         question = entry.get("question", "")
         answer = entry.get("answer", "")
-        metrics = entry.get("metrics", {})
         
         # Question bubble (user - light blue)
         st.markdown(f"""
-        <div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #2196f3;">
-            <strong>You</strong> [{timestamp}]<br>
+        <div class="chat-bubble-user">
+            <strong>You</strong> <span class="chat-timestamp">{timestamp}</span><br>
             {question}
         </div>
         """, unsafe_allow_html=True)
         
         # Answer bubble (bot - light green)
         st.markdown(f"""
-        <div style="background-color: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid #4caf50;">
-            <strong>DocuSearch</strong> [{mode}]<br>
+        <div class="chat-bubble-bot">
+            <strong>DocuSearch</strong> <span class="chat-mode-badge">{mode}</span><br>
             {answer}
         </div>
         """, unsafe_allow_html=True)
-        
-        # Show metrics in expandable
-        with st.expander(f"📊 Metrics - {metrics.get('total_seconds', 0):.2f}s, {metrics.get('total_tokens', 0)} tokens"):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Response Time", f"{metrics.get('total_seconds', 0):.2f}s")
-            with col2:
-                st.metric("Total Tokens", metrics.get('total_tokens', 0))
-            with col3:
-                st.metric("Mode", mode)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_aggregate_metrics() -> None:
+    """Display aggregate metrics for all questions at the bottom."""
+    if not history_enabled or not st.session_state.history_manager:
+        return
+    
+    current_doc = st.session_state.get("uploaded_name", None)
+    if not current_doc:
+        return
+    
+    # Get all questions for this document
+    history_limit = int(os.getenv("HISTORY_LIMIT", "10"))
+    recent = st.session_state.history_manager.get_recent_questions(
+        document_name=current_doc,
+        limit=history_limit
+    )
+    
+    if not recent:
+        return
+    
+    # Calculate aggregate metrics
+    total_time = sum(e.get('metrics', {}).get('total_seconds', 0) for e in recent)
+    total_tokens = sum(e.get('metrics', {}).get('total_tokens', 0) for e in recent)
+    total_prompt_tokens = sum(e.get('metrics', {}).get('prompt_tokens', 0) for e in recent)
+    total_completion_tokens = sum(e.get('metrics', {}).get('completion_tokens', 0) for e in recent)
+    avg_time = total_time / len(recent) if recent else 0
+    
+    # Mode breakdown
+    mode_counts = {}
+    for entry in recent:
+        mode = entry.get('mode', 'Unknown')
+        mode_counts[mode] = mode_counts.get(mode, 0) + 1
+    
+    st.markdown("---")
+    st.markdown("### 📊 Session Metrics")
+    
+    # Main metrics in 4 columns
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Queries", len(recent))
+    with col2:
+        st.metric("Total Response Time", f"{total_time:.2f}s")
+    with col3:
+        st.metric("Avg Response Time", f"{avg_time:.2f}s")
+    with col4:
+        st.metric("Total Tokens", total_tokens)
+    
+    # Token breakdown
+    col5, col6, col7 = st.columns(3)
+    with col5:
+        st.metric("Prompt Tokens", total_prompt_tokens)
+    with col6:
+        st.metric("Completion Tokens", total_completion_tokens)
+    with col7:
+        modes_str = ", ".join([f"{mode}({count})" for mode, count in mode_counts.items()])
+        st.metric("Modes Used", modes_str, label_visibility="visible")
 
 
 if "file_path" not in st.session_state:
@@ -401,6 +491,9 @@ if st.session_state.document_text:
     
     # Show conversation history
     render_chat_history()
+    
+    # Show aggregate metrics for all questions
+    render_aggregate_metrics()
     
     # Chat input area
     st.markdown("---")
