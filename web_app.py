@@ -15,6 +15,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Load LangSmith credentials from Streamlit secrets (for Streamlit Cloud deployment)
+try:
+    if hasattr(st, 'secrets') and 'LANGSMITH_API_KEY' in st.secrets:
+        os.environ['LANGSMITH_API_KEY'] = st.secrets['LANGSMITH_API_KEY']
+    if hasattr(st, 'secrets') and 'LANGSMITH_TRACING' in st.secrets:
+        os.environ['LANGSMITH_TRACING'] = st.secrets['LANGSMITH_TRACING']
+    if hasattr(st, 'secrets') and 'LANGSMITH_PROJECT' in st.secrets:
+        os.environ['LANGSMITH_PROJECT'] = st.secrets['LANGSMITH_PROJECT']
+except:
+    pass
+
 from src.ingest import extract_text
 from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
@@ -60,7 +71,7 @@ if is_mobile:
 st.title("DocuSearch")
 st.markdown(
     "Don't remember what a document is all about? Click Upload button, wait to load, ask a question "
-    "then run in it one or all the options below to see the response."
+    "then run in it one or all the options below to see the response. Metrics (speed, retrieval, token usage) are optional — click Show metrics under any answer to reveal them"
 )
 
 
