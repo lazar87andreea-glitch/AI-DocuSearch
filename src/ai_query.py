@@ -123,6 +123,7 @@ def generate_answer_with_meta(
                 "Content-Type": "application/json",
             }
             print(f"[AI_QUERY] Sending request to {base_url.rstrip('/')}/chat/completions", file=sys.stderr)
+            print(f"[AI_QUERY] Run status before API call: run={run is not None}, _ls_client={_ls_client is not None}", file=sys.stderr)
             resp = requests.post(
                 f"{base_url.rstrip('/')}/chat/completions",
                 json=payload,
@@ -133,7 +134,8 @@ def generate_answer_with_meta(
             resp.raise_for_status()
             data = resp.json()
             answer = data["choices"][0]["message"]["content"]
-            print(f"[AI_QUERY] SUCCESS: Got answer from LLM API", file=sys.stderr)
+            print(f"[AI_QUERY] SUCCESS: Got answer from LLM API (length={len(answer)})", file=sys.stderr)
+            print(f"[AI_QUERY] Run status before end_run: run={run is not None}, _ls_client={_ls_client is not None}", file=sys.stderr)
             
             # Extract token usage from response
             usage = data.get("usage") or {}
@@ -151,18 +153,24 @@ def generate_answer_with_meta(
             # End the LangSmith run successfully with token metrics
             if run and _ls_client:
                 try:
-                    _ls_client.end_run(
-                        run.id, 
-                        outputs={
-                            "answer": answer[:500],
-                            "prompt_tokens": prompt_tokens,
-                            "completion_tokens": completion_tokens,
-                            "total_tokens": total_tokens,
-                        }
-                    )
+                    print(f"[LANGSMITH] Ending run with outputs - run_id={run.id}", file=sys.stderr)
+                    outputs = {
+                        "answer": answer[:500] if answer else "",
+                        "prompt_tokens": int(prompt_tokens) if prompt_tokens else 0,
+                        "completion_tokens": int(completion_tokens) if completion_tokens else 0,
+                        "total_tokens": int(total_tokens) if total_tokens else 0,
+                    }
+                    print(f"[LANGSMITH] Outputs to send: {outputs}", file=sys.stderr)
+                    _ls_client.end_run(run.id, outputs=outputs)
                     print(f"[LANGSMITH] Run ended successfully: {run.id}", file=sys.stderr)
                 except Exception as e:
-                    print(f"[LANGSMITH] Failed to end run: {e}", file=sys.stderr)
+                    print(f"[LANGSMITH] Failed to end_run with outputs: {type(e).__name__}: {e}", file=sys.stderr)
+                    import traceback
+                    traceback.print_exc(file=sys.stderr)
+            elif run:
+                print(f"[LANGSMITH] Cannot end run: _ls_client={_ls_client}, run={run}", file=sys.stderr)
+            else:
+                print(f"[LANGSMITH] No run to end", file=sys.stderr)
 
             return {
                 "answer": answer,
