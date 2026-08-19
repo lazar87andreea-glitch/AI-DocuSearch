@@ -33,15 +33,24 @@ def _initialize_langsmith():
             for key, value in st.secrets.items():
                 converted = _to_env_string(value)
                 os.environ[key] = converted
-    except Exception:
-        pass
+                if "LANGSMITH" in key or "LLM" in key:
+                    print(f"[INIT] Set {key} = {converted[:50]}...", file=sys.stderr)
+    except Exception as e:
+        print(f"[INIT] Failed to load secrets: {e}", file=sys.stderr)
+    
+    # Log LangSmith configuration
+    print(f"[INIT] LANGSMITH_API_KEY present: {bool(os.getenv('LANGSMITH_API_KEY'))}", file=sys.stderr)
+    print(f"[INIT] LANGSMITH_TRACING: {os.getenv('LANGSMITH_TRACING')}", file=sys.stderr)
+    print(f"[INIT] LANGSMITH_PROJECT: {os.getenv('LANGSMITH_PROJECT')}", file=sys.stderr)
     
     # Now import langsmith with environment properly configured
     try:
         from langsmith import traceable as _langsmith_traceable
+        print(f"[INIT] LangSmith imported successfully", file=sys.stderr)
         return _langsmith_traceable
-    except Exception:
+    except Exception as e:
         # Return no-op decorator as fallback
+        print(f"[INIT] Failed to import LangSmith: {e}", file=sys.stderr)
         from typing import Callable, TypeVar
         _F = TypeVar("_F", bound=Callable[..., object])
         
