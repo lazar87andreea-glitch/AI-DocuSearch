@@ -213,6 +213,15 @@ if question != st.session_state.last_question:
 
 can_run = bool(st.session_state.document_text) and bool(question)
 
+# DEBUG: Show status in sidebar
+with st.sidebar:
+    st.write("### Debug Info")
+    st.write(f"📄 Document loaded: {'✅ Yes' if st.session_state.document_text else '❌ No'}")
+    st.write(f"❓ Question entered: {'✅ Yes' if question else '❌ No'}")
+    st.write(f"🔑 API key set: {'✅ Yes' if os.environ.get('OPENAI_API_KEY') else '❌ No (check Streamlit secrets)'}")
+    st.write(f"📱 Mobile mode: {'✅ On' if is_mobile else '❌ Off'}")
+    st.write(f"🟢 Can run: {'✅ Yes' if can_run else '❌ No'}")
+
 # On mobile, show only Direct LLM mode; on desktop, show all three modes
 if is_mobile:
     col1, col2 = st.columns([3, 1])
@@ -222,13 +231,24 @@ if is_mobile:
         "Sends the entire extracted document text directly to the LLM — no chunking, "
         "no embeddings, no retrieval step. **This works best on mobile.**"
     )
+    
+    # Test button to verify button clicks work
+    if st.button("🔧 Test Button (Should turn green)", key="test_btn"):
+        st.success("✅ Button works! If you see this, buttons are responding.")
+    
     if st.button("Run Direct LLM", disabled=not can_run, key="run_direct"):
-        with st.spinner("Asking the LLM..."):
-            try:
-                st.session_state.results["Direct LLM"] = run_direct(st.session_state.document_text, question)
-            except Exception as e:
-                st.error(f"❌ **Error**: {type(e).__name__}: {e}\n\nCheck that your API key is valid and the document is readable.")
-                print(f"[ERROR] Direct LLM failed: {e}", file=sys.stderr)
+        st.info("⏳ Processing... this may take 10-30 seconds")
+        try:
+            result = run_direct(st.session_state.document_text, question)
+            st.session_state.results["Direct LLM"] = result
+            st.success("✅ Query completed!")
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            st.error(f"❌ **Error**: {error_msg}")
+            st.info("**Troubleshooting:**\n- Check your API key in Streamlit secrets\n- Try with a smaller document\n- Check the Streamlit Cloud logs for details")
+            print(f"[ERROR] Direct LLM failed: {error_msg}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
     if "Direct LLM" in st.session_state.results:
         render_result("Direct LLM", st.session_state.results["Direct LLM"])
 else:
@@ -241,12 +261,17 @@ else:
             "relevant chunks, then ask the LLM using only that context."
         )
         if st.button("Run RAG", disabled=not can_run, key="run_rag"):
-            with st.spinner("Building index and retrieving..."):
-                try:
-                    st.session_state.results["RAG"] = run_rag(st.session_state.file_path, question)
-                except Exception as e:
-                    st.error(f"❌ **Error in RAG mode**: {type(e).__name__}: {e}")
-                    print(f"[ERROR] RAG failed: {e}", file=sys.stderr)
+            st.info("⏳ Processing... this may take 30-60 seconds (building embeddings)")
+            try:
+                result = run_rag(st.session_state.file_path, question)
+                st.session_state.results["RAG"] = result
+                st.success("✅ RAG completed!")
+            except Exception as e:
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                st.error(f"❌ **Error in RAG mode**: {error_msg}")
+                print(f"[ERROR] RAG failed: {error_msg}", file=sys.stderr)
+                import traceback
+                traceback.print_exc()
         if "RAG" in st.session_state.results:
             render_result("RAG", st.session_state.results["RAG"])
 
@@ -255,13 +280,23 @@ else:
             "Sends the entire extracted document text directly to the LLM — no chunking, "
             "no embeddings, no retrieval step."
         )
-        if st.button("Run Direct LLM", disabled=not can_run, key="run_direct"):
-            with st.spinner("Asking the LLM..."):
-                try:
-                    st.session_state.results["Direct LLM"] = run_direct(st.session_state.document_text, question)
-                except Exception as e:
-                    st.error(f"❌ **Error**: {type(e).__name__}: {e}")
-                    print(f"[ERROR] Direct LLM failed: {e}", file=sys.stderr)
+        # Test button
+        if st.button("🔧 Test Button (Should turn green)", key="test_btn_desktop"):
+            st.success("✅ Button works! If you see this, buttons are responding.")
+        
+        if st.button("Run Direct LLM", disabled=not can_run, key="run_direct_desktop"):
+            st.info("⏳ Processing... this may take 10-30 seconds")
+            try:
+                result = run_direct(st.session_state.document_text, question)
+                st.session_state.results["Direct LLM"] = result
+                st.success("✅ Query completed!")
+            except Exception as e:
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                st.error(f"❌ **Error**: {error_msg}")
+                st.info("**Troubleshooting:**\n- Check your API key in Streamlit secrets\n- Try with a smaller document\n- Check the Streamlit Cloud logs for details")
+                print(f"[ERROR] Direct LLM failed: {error_msg}", file=sys.stderr)
+                import traceback
+                traceback.print_exc()
         if "Direct LLM" in st.session_state.results:
             render_result("Direct LLM", st.session_state.results["Direct LLM"])
 
@@ -271,14 +306,19 @@ else:
             "if the embedding pipeline fails (e.g. low memory or a missing dependency)."
         )
         if st.button("Run Hybrid", disabled=not can_run, key="run_hybrid"):
-            with st.spinner("Running hybrid pipeline..."):
-                try:
-                    st.session_state.results["Hybrid"] = run_hybrid(
-                        st.session_state.file_path, st.session_state.document_text, question
-                    )
-                except Exception as e:
-                    st.error(f"❌ **Error in Hybrid mode**: {type(e).__name__}: {e}")
-                    print(f"[ERROR] Hybrid failed: {e}", file=sys.stderr)
+            st.info("⏳ Processing... trying RAG, will fallback to Direct LLM if needed")
+            try:
+                result = run_hybrid(
+                    st.session_state.file_path, st.session_state.document_text, question
+                )
+                st.session_state.results["Hybrid"] = result
+                st.success("✅ Hybrid completed!")
+            except Exception as e:
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                st.error(f"❌ **Error in Hybrid mode**: {error_msg}")
+                print(f"[ERROR] Hybrid failed: {error_msg}", file=sys.stderr)
+                import traceback
+                traceback.print_exc()
         if "Hybrid" in st.session_state.results:
             render_result("Hybrid", st.session_state.results["Hybrid"])
 
