@@ -28,9 +28,11 @@ except:
 
 # Import langsmith BEFORE src modules (so @traceable decorator is available)
 try:
-    from langsmith import traceable
-except Exception:
+    from langsmith import traceable as _langsmith_traceable
+    traceable = _langsmith_traceable  # Export for src modules
+except Exception as e:
     # LangSmith is optional; no-op decorator keeps tracing calls safe when it's not installed.
+    print(f"Warning: LangSmith import failed: {e}", file=sys.stderr)
     from typing import Callable, TypeVar
 
     _F = TypeVar("_F", bound=Callable[..., object])
@@ -39,6 +41,9 @@ except Exception:
         def _decorator(fn: _F) -> _F:
             return fn
         return _decorator
+
+# Export traceable to sys.modules so src modules can import it from web_app
+sys.modules[__name__].traceable = traceable
 
 # NOW import src modules (they will use the traceable decorator with env vars already set)
 from src.ingest import extract_text

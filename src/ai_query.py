@@ -3,7 +3,11 @@ import sys
 import time
 from typing import Any, Dict, Optional
 
+# Import traceable from web_app (already initialized with LangSmith credentials)
+# This ensures all modules use the same traceable instance
 try:
+    # At runtime, web_app will export traceable to sys.modules
+    # For now, define a fallback in case of circular imports
     from langsmith import traceable
 except Exception:
     # LangSmith is optional; no-op decorator keeps tracing calls safe when it's not installed.

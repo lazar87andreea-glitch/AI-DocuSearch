@@ -7,6 +7,7 @@ from .ai_query import generate_answer_with_meta
 from .prompt_loader import load_prompt_with_temperature
 from typing import Dict, Any
 
+# Import traceable from langsmith (initialized by web_app with credentials)
 try:
     from langsmith import traceable  # type: ignore[reportUnknownVariableType]
 except Exception:
