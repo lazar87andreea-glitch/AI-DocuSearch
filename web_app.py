@@ -296,7 +296,49 @@ def render_history_sidebar() -> None:
         btn_label = f"[{mode}] {timestamp}\n{question}"
         if st.sidebar.button(btn_label, key=f"history_btn_{i}", use_container_width=True):
             st.session_state.last_question = entry.get("question", "")
+            st.session_state.selected_history_entry = entry
             st.rerun()
+
+
+def render_chat_history() -> None:
+    """Display selected history entry as a chat bubble."""
+    if "selected_history_entry" not in st.session_state:
+        return
+    
+    entry = st.session_state.selected_history_entry
+    
+    # Create a nice chat-style display
+    st.markdown("---")
+    st.markdown("### 💬 Previous Response")
+    
+    # Question in a light blue box
+    st.markdown(f"""
+    <div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+        <strong>Q:</strong> {entry.get('question', '')}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Answer in a light green box
+    st.markdown(f"""
+    <div style="background-color: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+        <strong>A:</strong> {entry.get('answer', '')}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Metadata
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Mode", entry.get("mode", ""))
+    with col2:
+        st.metric("Response Time", f"{entry.get('metrics', {}).get('total_seconds', 0):.2f}s")
+    with col3:
+        st.metric("Tokens Used", entry.get('metrics', {}).get('total_tokens', 0))
+    
+    # Clear button
+    if st.button("Clear", key="clear_history_display"):
+        if "selected_history_entry" in st.session_state:
+            del st.session_state.selected_history_entry
+        st.rerun()
 
 
 if "file_path" not in st.session_state:
@@ -365,6 +407,9 @@ question = st.text_input("Ask a question about the document")
 if question != st.session_state.last_question:
     st.session_state.last_question = question
     st.session_state.results = {}
+
+# Render chat history if a previous question was selected
+render_chat_history()
 
 can_run = bool(st.session_state.document_text) and bool(question)
 
