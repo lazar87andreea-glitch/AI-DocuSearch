@@ -273,7 +273,7 @@ def render_history_sidebar() -> None:
 
 
 def render_chat_history() -> None:
-    """Display conversation history as a clean chat interface with responsive margins."""
+    """Display conversation history with left/right aligned bubbles and avatars."""
     if not history_enabled or not st.session_state.history_manager:
         return
     
@@ -291,63 +291,78 @@ def render_chat_history() -> None:
     if not recent:
         return
     
-    # Display conversation (reverse order so newest is at bottom)
-    # Responsive chat container with margins - works on dark mode
+    # Chat styling with left/right aligned bubbles and avatars
     st.markdown("""
     <style>
-        .chat-box {
-            background-color: #f5f5f5;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 12px 0;
-            min-height: 200px;
-            max-height: 600px;
-            overflow-y: auto;
+        .chat-message {
+            display: flex;
+            margin-bottom: 16px;
+            align-items: flex-start;
+            gap: 8px;
         }
-        @media (prefers-color-scheme: dark) {
-            .chat-box {
-                background-color: #2d2d2d;
-                border-color: #404040;
-            }
+        .chat-message.user {
+            justify-content: flex-start;
         }
-        .chat-bubble-user {
-            background-color: #e3f2fd;
+        .chat-message.bot {
+            justify-content: flex-end;
+        }
+        .chat-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .chat-avatar.user {
+            background-color: #4caf50;
+            order: -1;
+        }
+        .chat-avatar.bot {
+            background-color: #2196f3;
+        }
+        .chat-bubble {
+            max-width: 70%;
             padding: 12px 16px;
             border-radius: 12px;
-            margin-bottom: 12px;
-            border-left: 4px solid #2196f3;
-            margin-right: 0;
-            color: #000;
             word-wrap: break-word;
-        }
-        .chat-bubble-bot {
-            background-color: #e8f5e9;
-            padding: 12px 16px;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            border-left: 4px solid #4caf50;
-            margin-left: 0;
             color: #000;
-            word-wrap: break-word;
         }
-        .chat-timestamp {
-            font-size: 0.8em;
-            color: #555;
-            display: block;
+        .chat-bubble.user {
+            background-color: #d3d3d3;
+        }
+        .chat-bubble.bot {
+            background-color: #4caf50;
+            color: white;
+        }
+        .chat-info {
+            font-size: 0.75em;
             margin-top: 4px;
         }
-        .chat-mode-badge {
-            display: inline-block;
-            background-color: #ddd;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.75em;
-            margin-left: 4px;
-            color: #333;
+        .chat-info.user {
+            color: #666;
+        }
+        .chat-info.bot {
+            color: rgba(255,255,255,0.8);
+        }
+        @media (prefers-color-scheme: dark) {
+            .chat-bubble.user {
+                background-color: #555;
+                color: #fff;
+            }
+            .chat-bubble.bot {
+                background-color: #2e7d32;
+                color: white;
+            }
+            .chat-info.user {
+                color: #aaa;
+            }
         }
     </style>
-    <div class="chat-box">
     """, unsafe_allow_html=True)
     
     # Display each conversation turn
@@ -357,23 +372,27 @@ def render_chat_history() -> None:
         question = entry.get("question", "")
         answer = entry.get("answer", "")
         
-        # Question bubble (user - light blue)
+        # User message (left-aligned)
         st.markdown(f"""
-        <div class="chat-bubble-user">
-            <strong>You</strong> <span class="chat-mode-badge">{timestamp}</span><br>
-            {question}
+        <div class="chat-message user">
+            <div class="chat-avatar user">YOU</div>
+            <div>
+                <div class="chat-bubble user">{question}</div>
+                <div class="chat-info user">{timestamp}</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Answer bubble (bot - light green)
+        # Bot message (right-aligned)
         st.markdown(f"""
-        <div class="chat-bubble-bot">
-            <strong>DocuSearch</strong> <span class="chat-mode-badge">{mode}</span><br>
-            {answer}
+        <div class="chat-message bot">
+            <div>
+                <div class="chat-bubble bot">{answer}</div>
+                <div class="chat-info bot">{mode}</div>
+            </div>
+            <div class="chat-avatar bot">🤖</div>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_aggregate_metrics() -> None:
@@ -502,28 +521,34 @@ if "chat_messages" not in st.session_state:
 
 # If document is uploaded, show chat interface
 if st.session_state.document_text:
+    # Chat container
+    st.markdown("<div style='background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; @media (prefers-color-scheme: dark) { background-color: #1e1e1e; border-color: #333; }'>" , unsafe_allow_html=True)
     
-    # Show conversation history
-    render_chat_history()
-    
-    # Show aggregate metrics for all questions
-    render_aggregate_metrics()
-    
-    # Chat input area
-    st.markdown("---")
-    
-    # Mode selector
+    # Mode selector at the top of chat box
     col_mode, col_spacer = st.columns([2, 3])
     with col_mode:
         mode = st.radio(
             "Select Mode:",
             options=["Direct LLM", "RAG", "Hybrid"],
             horizontal=True,
-            key="chat_mode_selector"
+            key="chat_mode_selector",
+            label_visibility="collapsed"
         )
+    
+    st.markdown("---")
+    
+    # Show conversation history
+    render_chat_history()
+    
+    st.markdown("---")
     
     # Chat input
     question = st.chat_input("Ask a question about the document...", key="chat_input")
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Show aggregate metrics below chat box
+    render_aggregate_metrics()
     
     if question:
         # Disable RAG/Hybrid on mobile
