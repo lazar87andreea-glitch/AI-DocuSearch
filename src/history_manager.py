@@ -99,7 +99,7 @@ class HistoryManager:
     
     @staticmethod
     def cleanup_old_sessions(retention_days: int = 30) -> None:
-        """Delete session files older than retention_days.
+        """Delete session files where all entries are older than retention_days.
         
         Args:
             retention_days: Number of days to retain history files (default 30)
@@ -109,21 +109,38 @@ class HistoryManager:
             return
         
         cutoff_time = datetime.now() - timedelta(days=retention_days)
-        cutoff_timestamp = cutoff_time.timestamp()
         
         for filename in os.listdir(history_dir):
             if not filename.startswith("user_"):
                 continue
             
             filepath = os.path.join(history_dir, filename)
-            file_mtime = os.path.getmtime(filepath)
             
-            if file_mtime < cutoff_timestamp:
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    history = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                continue
+            
+            if not history:
+                # Empty file, delete it
                 try:
                     os.remove(filepath)
-                    print(f"[HISTORY] Cleaned up old session file: {filename}")
+                    print(f"[HISTORY] Cleaned up empty session file: {filename}")
                 except Exception as e:
                     print(f"[HISTORY] Could not delete {filename}: {e}")
+                continue
+            
+            # Check if most recent entry is older than cutoff
+            most_recent = history[0]  # Sorted newest first
+            try:
+                latest_timestamp = datetime.fromisoformat(most_recent.get("timestamp", ""))
+                if latest_timestamp < cutoff_time:
+                    os.remove(filepath)
+                    print(f"[HISTORY] Cleaned up old session file: {filename}")
+            except (ValueError, AttributeError):
+                # Invalid timestamp format, skip
+                pass
     
     # Private helper methods
     
