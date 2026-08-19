@@ -362,6 +362,44 @@ python test_ingest.py
 
 ---
 
+## OCR on Streamlit Cloud
+
+### System Dependencies
+
+For OCR support on Streamlit Cloud, the `packages.txt` file must include:
+
+```
+tesseract-ocr
+poppler-utils
+libtesseract-dev
+```
+
+These system packages are automatically installed during Streamlit Cloud deployment.
+
+### Language Support
+
+Tesseract includes English by default. For other languages (e.g., Romanian):
+
+**On local development:**
+- Install language data: `apt-get install tesseract-ocr-ron` (Romanian)
+- Or use environment variable: `TESSERACT_CONFIG` with language code: `export TESSDATA_PREFIX=/path/to/tessdata`
+
+**On Streamlit Cloud:**
+- Language packs are installed automatically with `tesseract-ocr` package
+- Romanian OCR works out-of-the-box
+
+### Troubleshooting OCR
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "pdf2image not found" | Missing Python package | Ensure `pdf2image` in `requirements.txt` |
+| "poppler-utils not found" | Missing system package | Ensure `poppler-utils` in `packages.txt` |
+| "pytesseract not found" | Missing Python package | Ensure `pytesseract` in `requirements.txt` |
+| OCR very slow (60+ seconds) | Large or high-DPI PDF | Normal for scanned documents; consider splitting them |
+| Poor OCR results | Low quality scan or non-Latin script | Rescan at higher DPI or convert to digital PDF |
+
+---
+
 ## Performance Considerations
 
 - **Large PDFs:** Processing very large PDFs (100+ MB) may take time; consider processing in chunks

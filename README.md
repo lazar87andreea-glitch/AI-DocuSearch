@@ -7,12 +7,16 @@ This project is designed to be simple, explainable, and Git-friendly while remai
 ## Overview
 
 AI DocuSearch supports:
-- PDF, DOCX, and TXT ingestion
-- Cleaning and chunking for retrieval
-- Lightweight retrieval fallback for low-memory environments
-- Live LLM integration with any OpenAI-compatible provider (OpenAI, xAI/Grok, Groq, etc.)
-- A single browser app that runs RAG, Direct LLM, and Hybrid modes side by side with optional speed/token metrics
-- Git-ready project structure and documentation
+- **PDF, DOCX, and TXT ingestion** — with automatic OCR fallback for scanned PDFs
+- **Multi-language support** — OCR works with Romanian, English, and other languages (via Tesseract)
+- **Cleaning and chunking for retrieval**
+- **Lightweight retrieval fallback** for low-memory environments
+- **Live LLM integration** with any OpenAI-compatible provider (OpenAI, xAI/Grok, Groq, etc.)
+- **Browser-based Streamlit app** — runs RAG, Direct LLM, and Hybrid modes with performance metrics
+- **Mobile-optimized UI** — responsive design for Android, iOS, and desktop browsers
+- **Streamlit Cloud ready** — deploy in minutes with Secrets configuration
+- **LangSmith tracing** — optional observability for all LLM calls
+- **Git-ready project structure** and comprehensive documentation
 
 ## Why this project exists
 
@@ -55,9 +59,11 @@ AI DocuSearch/
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
+├── packages.txt                    # System dependencies for Streamlit Cloud
 ├── demo.py
 ├── web_app.py
 ├── test_ingest.py
+├── test_langsmith.py               # LangSmith configuration verification
 ├── src/
 │   ├── ai_query.py
 │   ├── embed_index.py
@@ -74,7 +80,9 @@ AI DocuSearch/
 │   ├── STEP_2_PREPROCESS.md
 │   ├── STEP_3_EMBEDDING_INDEXING.md
 │   ├── STEP_4_AI_QUERY.md
-│   └── STEP_5_PIPELINE.md
+│   ├── STEP_5_PIPELINE.md
+│   ├── STEP_6_HISTORY_TRACKING.md
+│   └── STEP_7_STREAMLIT_CLOUD_DEPLOYMENT.md
 ├── examples/
 └── ...
 ```
@@ -186,6 +194,57 @@ for every `generate_answer` call, `build_pipeline` call, and `answer_question` c
 tokens. Runs for the unified web app also show which mode (RAG / Direct LLM / Hybrid) produced
 them, nested as a trace tree. Tracing is entirely optional: if `langsmith` isn't installed or
 tracing isn't enabled, the app behaves exactly the same with no extra network calls.
+
+**Verify LangSmith is working:** Run `python test_langsmith.py` to confirm the connection to your LangSmith project.
+
+## Streamlit Cloud Deployment
+
+Deploy the app to [Streamlit Cloud](https://streamlit.io/cloud) in minutes:
+
+### 1. Push to GitHub
+
+Ensure your repository has:
+- `requirements.txt` — all Python dependencies
+- `packages.txt` — system dependencies (Tesseract OCR, Poppler, etc.) for scanned PDF support
+- `.env.example` — example env file (do NOT push `.env` with real keys)
+
+### 2. Create Streamlit Cloud app
+
+1. Go to [share.streamlit.io](https://share.streamlit.io)
+2. Click "New app"
+3. Select your GitHub repo, branch, and `web_app.py`
+4. Click "Deploy"
+
+### 3. Configure Secrets
+
+After deployment, go to **Settings** → **Secrets** and add:
+
+```toml
+OPENAI_API_KEY = "sk-..."
+LANGSMITH_API_KEY = "lsv2_pt_..."
+LANGSMITH_TRACING = "true"
+LANGSMITH_PROJECT = "ai-docusearch"
+```
+
+**Note:** Replace with your actual API keys. These are NOT read from `.env` on Streamlit Cloud — they must be set in the web UI.
+
+### 4. Supported Formats
+
+- **Searchable PDFs** — text extracted instantly ✓
+- **Scanned PDFs (including Romanian)** — OCR fallback (30-60 seconds) ✓
+- **DOCX files** — extracted with table support ✓
+- **TXT files** — raw text ✓
+
+## Mobile Browser Support
+
+The app is optimized for mobile browsers (Android, iOS):
+- ✅ Responsive layout (2-column metrics on mobile, 4-column on desktop)
+- ✅ Simplified UI for mobile (Direct LLM mode recommended)
+- ✅ RAG & Hybrid modes disabled on mobile (resource constraints on Streamlit Cloud)
+- ✅ Touch-friendly buttons and text input
+- ✅ Works offline after page loads
+
+Test on mobile: Upload a document, ask a question, click "Run Direct LLM"
 
 ## Documentation
 

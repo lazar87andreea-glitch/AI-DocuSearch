@@ -51,13 +51,15 @@ Return answer + source references
 
 ```text
 AI DocuSearch/
-├── README.md
-├── .env.example
-├── .gitignore
-├── requirements.txt
-├── demo.py
-├── web_app.py
-├── test_ingest.py
+├── README.md                          # Project overview & quick start
+├── .env.example                       # Environment variables template
+├── .gitignore                         # Git ignore rules
+├── requirements.txt                   # Python dependencies
+├── packages.txt                       # System dependencies (Streamlit Cloud)
+├── demo.py                            # CLI demo script
+├── web_app.py                         # Streamlit web application
+├── test_ingest.py                     # Document ingestion tests
+├── test_langsmith.py                  # LangSmith configuration verification
 ├── src/
 │   ├── ai_query.py
 │   ├── embed_index.py
@@ -74,8 +76,11 @@ AI DocuSearch/
 │   ├── STEP_2_PREPROCESS.md
 │   ├── STEP_3_EMBEDDING_INDEXING.md
 │   ├── STEP_4_AI_QUERY.md
-│   └── STEP_5_PIPELINE.md
+│   ├── STEP_5_PIPELINE.md
+│   ├── STEP_6_HISTORY_TRACKING.md
+│   └── STEP_7_STREAMLIT_CLOUD_DEPLOYMENT.md
 ├── examples/
+│   └── sample.txt
 └── ...
 ```
 
@@ -181,6 +186,50 @@ easy to find and edit without touching Python code. Each file may start with an 
 `# temperature: <value>` directive line — `load_prompt_with_temperature()` reads and strips it,
 falling back to `LLM_TEMPERATURE`, then `0.2`, if absent. This is the intended way to tune
 temperature per prompt; there is no runtime/UI control for it.
+
+## Streamlit Cloud Deployment
+
+AI DocuSearch is optimized for [Streamlit Cloud](https://streamlit.io/cloud) deployment with:
+
+- **System dependencies** — `packages.txt` includes Tesseract OCR and Poppler for scanned PDF support
+- **Secret management** — App reads `OPENAI_API_KEY`, `LANGSMITH_API_KEY` from Streamlit secrets (not `.env`)
+- **Mobile optimization** — Responsive UI detects device type and adjusts layout automatically
+- **Language support** — OCR works with Romanian, English, and other Tesseract-supported languages
+- **Fast deployment** — Push to GitHub; app redeploys automatically
+
+For detailed deployment instructions, see **Docs/STEP_7_STREAMLIT_CLOUD_DEPLOYMENT.md**.
+
+## Recent Features & Improvements
+
+### OCR Support for Scanned PDFs
+- Automatic fallback to OCR when PDF has no text layer
+- Supports multi-language documents (Romanian, English, etc.)
+- Tesseract OCR + Poppler automatically installed on Streamlit Cloud via `packages.txt`
+
+### Mobile Browser Optimization
+- Responsive 2-column layout on mobile (4-column on desktop)
+- Direct LLM mode optimized for mobile (RAG/Hybrid modes disabled due to resource limits)
+- Touch-friendly buttons and text input
+
+### LangSmith Integration Fix
+- App now correctly reads LangSmith credentials from Streamlit Cloud **Secrets** (not just `.env`)
+- `test_langsmith.py` included for local verification
+
+### Improved Error Handling
+- Better error messages for file extraction failures
+- Visible feedback for button clicks and processing status
+- Detailed logs for troubleshooting
+
+## Documentation Set
+
+The `Docs/` folder contains step-by-step guides for each component:
+- **STEP_1_INGEST.md** — Document text extraction (including OCR)
+- **STEP_2_PREPROCESS.md** — Text cleaning and chunking
+- **STEP_3_EMBEDDING_INDEXING.md** — Embedding generation and retrieval
+- **STEP_4_AI_QUERY.md** — LLM integration and answer generation
+- **STEP_5_PIPELINE.md** — Full flow orchestration
+- **STEP_6_HISTORY_TRACKING.md** — (Optional) Session history and analytics
+- **STEP_7_STREAMLIT_CLOUD_DEPLOYMENT.md** — Deployment and configuration
 
 ## Design notes for GitHub publication
 
