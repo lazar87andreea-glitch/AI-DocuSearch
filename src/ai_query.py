@@ -78,13 +78,28 @@ def generate_answer_with_meta(
             try:
                 from langsmith import Client
                 _ls_client = Client()
+                
+                # Extract question from prompt (usually appears after "Question:" or at the end)
+                question_text = prompt
+                if "Question:" in prompt:
+                    question_text = prompt.split("Question:")[-1].strip()[:200]
+                elif "question" in prompt.lower():
+                    # Find context around the word "question"
+                    parts = prompt.lower().split("question")
+                    if len(parts) > 1:
+                        question_text = prompt.split(parts[0] + "question")[-1].strip()[:200]
+                
                 run = _ls_client.create_run(
                     name="generate_answer",
                     run_type="llm",
-                    inputs={"prompt": prompt},
+                    inputs={
+                        "question": question_text[:300],  # Store the question separately
+                        "prompt_length": len(prompt),  # Store prompt size for context
+                        "model": resolved_model,
+                    },
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[LANGSMITH] Failed to create run: {e}", file=sys.stderr)
 
             payload = {
                 "model": resolved_model,
@@ -111,9 +126,18 @@ def generate_answer_with_meta(
             # End the LangSmith run successfully
             if run:
                 try:
-                    _ls_client.end_run(run.id, outputs={"answer": answer})
-                except Exception:
-                    pass
+                    _ls_client.end_run(
+                        run.id, 
+                        outputs={
+                            "answer": answer[:500],  # Store first 500 chars of answer
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": total_tokens,
+                            "temperature": resolved_temperature,
+                        }
+                    )
+                except Exception as e:
+                    print(f"[LANGSMITH] Failed to end run: {e}", file=sys.stderr)
 
             usage = data.get("usage") or {}
             prompt_tokens = usage.get("prompt_tokens")
@@ -146,8 +170,8 @@ def generate_answer_with_meta(
             if 'run' in locals() and run:
                 try:
                     _ls_client.end_run(run.id, error=str(e))
-                except Exception:
-                    pass
+                except Exception as ls_err:
+                    print(f"[LANGSMITH] Failed to end run with error: {ls_err}", file=sys.stderr)
     else:
         print(f"[AI_QUERY] MISSING CONFIG: api_key={bool(api_key)}, base_url={bool(base_url)}, model={bool(resolved_model)}", file=sys.stderr)
 
