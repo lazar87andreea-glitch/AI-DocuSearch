@@ -48,13 +48,8 @@ except Exception:
 
 st.set_page_config(page_title="DocuSearch", layout="wide")
 
-# Manual mobile toggle in sidebar (for debugging + manual override)
-with st.sidebar:
-    st.write("### Device Settings")
-    force_mobile = st.checkbox("📱 Force mobile mode (for testing)")
-
 # Check if on mobile
-is_mobile = force_mobile or is_mobile_browser()
+is_mobile = is_mobile_browser()
 
 if is_mobile:
     st.warning(
@@ -64,9 +59,8 @@ if is_mobile:
 
 st.title("DocuSearch")
 st.markdown(
-    "Upload a document, ask a question, then run **RAG**, **Direct LLM**, and **Hybrid** "
-    "modes side by side. Metrics (speed, retrieval, token usage) are optional — click "
-    "**Show metrics** under any answer to reveal them."
+    "Don't remember what a document is all about? Click Upload button, wait to load, ask a question "
+    "then run in it one or all the options below to see the response."
 )
 
 
@@ -239,23 +233,6 @@ if question != st.session_state.last_question:
 
 can_run = bool(st.session_state.document_text) and bool(question)
 
-# DEBUG: Show status in sidebar
-with st.sidebar:
-    st.write("### Debug Info")
-    st.write(f"📄 Document loaded: {'✅ Yes' if st.session_state.document_text else '❌ No'}")
-    if st.session_state.document_text:
-        st.write(f"   - Size: {len(st.session_state.document_text)} chars")
-    st.write(f"❓ Question entered: {'✅ Yes' if question else '❌ No'}")
-    st.write(f"🔑 API key set: {'✅ Yes' if os.environ.get('OPENAI_API_KEY') else '❌ No (check Streamlit secrets)'}")
-    st.write(f"📱 Mobile mode: {'✅ On' if is_mobile else '❌ Off'}")
-    st.write(f"🟢 Can run: {'✅ Yes' if can_run else '❌ No'}")
-    
-    # Show file path for debugging
-    if st.session_state.get("file_path"):
-        st.write(f"📂 File path: {st.session_state.file_path}")
-    if st.session_state.get("uploaded_name"):
-        st.write(f"📋 Uploaded: {st.session_state.uploaded_name}")
-
 # On mobile, show only Direct LLM mode; on desktop, show all three modes
 if is_mobile:
     col1, col2 = st.columns([3, 1])
@@ -265,11 +242,6 @@ if is_mobile:
         "Sends the entire extracted document text directly to the LLM — no chunking, "
         "no embeddings, no retrieval step. **This works best on mobile.**"
     )
-    
-    # Test button to verify button clicks work
-    if st.button("🔧 Test Button (Should turn green)", key="test_btn"):
-        st.success("✅ Button works! If you see this, buttons are responding.")
-    
     if st.button("Run Direct LLM", disabled=not can_run, key="run_direct"):
         st.info("⏳ Processing... this may take 10-30 seconds")
         try:
@@ -314,10 +286,6 @@ else:
             "Sends the entire extracted document text directly to the LLM — no chunking, "
             "no embeddings, no retrieval step."
         )
-        # Test button
-        if st.button("🔧 Test Button (Should turn green)", key="test_btn_desktop"):
-            st.success("✅ Button works! If you see this, buttons are responding.")
-        
         if st.button("Run Direct LLM", disabled=not can_run, key="run_direct_desktop"):
             st.info("⏳ Processing... this may take 10-30 seconds")
             try:
