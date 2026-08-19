@@ -73,10 +73,13 @@ def generate_answer_with_meta(
     print(f"[AI_QUERY] Model: {resolved_model}", file=sys.stderr)
     print(f"[AI_QUERY] Temperature: {resolved_temperature}", file=sys.stderr)
 
+    # Initialize LangSmith variables
+    _ls_client = None
+    run = None
+    run_ended = False  # Track if we've already ended the run
+    
     if api_key and base_url and resolved_model:
         # Initialize LangSmith client once
-        _ls_client = None
-        run = None
         try:
             from langsmith import Client
             _ls_client = Client()
@@ -106,9 +109,17 @@ def generate_answer_with_meta(
                         "model": resolved_model,
                     },
                 )
-                print(f"[LANGSMITH] Run created: {run.id}", file=sys.stderr)
+                print(f"[LANGSMITH] Run created with ID: {run.id if hasattr(run, 'id') else run}", file=sys.stderr)
             except Exception as e:
                 print(f"[LANGSMITH] Failed to create run: {e}", file=sys.stderr)
+                run = None
+        
+        # Try to get the answer from the API
+        answer = None
+        api_error = None
+        prompt_tokens = None
+        completion_tokens = None
+        total_tokens = None
         
         try:
             import requests
@@ -123,7 +134,7 @@ def generate_answer_with_meta(
                 "Content-Type": "application/json",
             }
             print(f"[AI_QUERY] Sending request to {base_url.rstrip('/')}/chat/completions", file=sys.stderr)
-            print(f"[AI_QUERY] Run status before API call: run={run is not None}, _ls_client={_ls_client is not None}", file=sys.stderr)
+            
             resp = requests.post(
                 f"{base_url.rstrip('/')}/chat/completions",
                 json=payload,
@@ -135,65 +146,72 @@ def generate_answer_with_meta(
             data = resp.json()
             answer = data["choices"][0]["message"]["content"]
             print(f"[AI_QUERY] SUCCESS: Got answer from LLM API (length={len(answer)})", file=sys.stderr)
-            print(f"[AI_QUERY] Run status before end_run: run={run is not None}, _ls_client={_ls_client is not None}", file=sys.stderr)
             
             # Extract token usage from response
             usage = data.get("usage") or {}
             prompt_tokens = usage.get("prompt_tokens")
             completion_tokens = usage.get("completion_tokens")
             total_tokens = usage.get("total_tokens")
-            estimated = prompt_tokens is None or completion_tokens is None
             if prompt_tokens is None:
                 prompt_tokens = _estimate_tokens(prompt)
             if completion_tokens is None:
                 completion_tokens = _estimate_tokens(answer)
             if total_tokens is None:
                 total_tokens = prompt_tokens + completion_tokens
-            
-            # End the LangSmith run successfully with token metrics
-            if run and _ls_client:
-                try:
-                    print(f"[LANGSMITH] Ending run with outputs - run_id={run.id}", file=sys.stderr)
+                
+        except Exception as e:
+            print(f"[AI_QUERY] ERROR during API call: {type(e).__name__}: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            api_error = str(e)
+            answer = f"[ERROR] {type(e).__name__}: {e}"
+            prompt_tokens = _estimate_tokens(prompt)
+            completion_tokens = _estimate_tokens(answer)
+            total_tokens = prompt_tokens + completion_tokens
+        
+        # NOW end the run (only once, AFTER we have all data)
+        print(f"[LANGSMITH] About to end run: run={run is not None}, _ls_client={_ls_client is not None}, api_error={api_error is not None}", file=sys.stderr)
+        
+        if run and _ls_client and not run_ended:
+            try:
+                run_id = run.id if hasattr(run, 'id') else run
+                print(f"[LANGSMITH] Ending run with ID: {run_id}", file=sys.stderr)
+                
+                if api_error:
+                    # API call failed - end run with error
+                    print(f"[LANGSMITH] Ending run with error: {api_error}", file=sys.stderr)
+                    _ls_client.end_run(run_id, error=api_error)
+                else:
+                    # API call succeeded - end run with outputs
                     outputs = {
                         "answer": answer[:500] if answer else "",
                         "prompt_tokens": int(prompt_tokens) if prompt_tokens else 0,
                         "completion_tokens": int(completion_tokens) if completion_tokens else 0,
                         "total_tokens": int(total_tokens) if total_tokens else 0,
                     }
-                    print(f"[LANGSMITH] Outputs to send: {outputs}", file=sys.stderr)
-                    _ls_client.end_run(run.id, outputs=outputs)
-                    print(f"[LANGSMITH] Run ended successfully: {run.id}", file=sys.stderr)
-                except Exception as e:
-                    print(f"[LANGSMITH] Failed to end_run with outputs: {type(e).__name__}: {e}", file=sys.stderr)
-                    import traceback
-                    traceback.print_exc(file=sys.stderr)
-            elif run:
-                print(f"[LANGSMITH] Cannot end run: _ls_client={_ls_client}, run={run}", file=sys.stderr)
-            else:
-                print(f"[LANGSMITH] No run to end", file=sys.stderr)
-
-            return {
-                "answer": answer,
-                "elapsed_seconds": time.perf_counter() - start,
-                "used_live_api": True,
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": total_tokens,
-                "estimated_tokens": estimated,
-                "temperature": resolved_temperature,
-            }
-        except Exception as e:
-            print(f"[AI_QUERY] ERROR: {type(e).__name__}: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc(file=sys.stderr)
-            
-            # End the LangSmith run with error
-            if run and _ls_client:
-                try:
-                    _ls_client.end_run(run.id, error=str(e))
-                    print(f"[LANGSMITH] Run ended with error: {run.id}", file=sys.stderr)
-                except Exception as ls_err:
-                    print(f"[LANGSMITH] Failed to end run with error: {ls_err}", file=sys.stderr)
+                    print(f"[LANGSMITH] Ending run with outputs: {outputs}", file=sys.stderr)
+                    _ls_client.end_run(run_id, outputs=outputs)
+                
+                print(f"[LANGSMITH] Run ended successfully", file=sys.stderr)
+                run_ended = True
+                    
+            except Exception as ls_error:
+                print(f"[LANGSMITH] CRITICAL ERROR: Failed to end_run: {type(ls_error).__name__}: {ls_error}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
+        
+        # Return result
+        estimated_tokens = prompt_tokens is None or completion_tokens is None
+        return {
+            "answer": answer,
+            "elapsed_seconds": time.perf_counter() - start,
+            "used_live_api": api_error is None,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+            "estimated_tokens": estimated_tokens,
+            "temperature": resolved_temperature,
+        }
     else:
         print(f"[AI_QUERY] MISSING CONFIG: api_key={bool(api_key)}, base_url={bool(base_url)}, model={bool(resolved_model)}", file=sys.stderr)
 
@@ -211,15 +229,3 @@ def generate_answer_with_meta(
         "estimated_tokens": True,
         "temperature": resolved_temperature,
     }
-
-
-def generate_answer(
-    prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
-) -> str:
-    return generate_answer_with_meta(prompt, model_name=model_name, temperature=temperature)["answer"]
-
-
-if __name__ == "__main__":
-    print(generate_answer("Hello world"))
-
-
