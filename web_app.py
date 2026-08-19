@@ -16,23 +16,30 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Load LangSmith credentials from Streamlit secrets BEFORE importing modules that use @traceable
+print("[DEBUG] Setting up LangSmith credentials...", file=sys.stderr)
 try:
     if hasattr(st, 'secrets') and 'LANGSMITH_API_KEY' in st.secrets:
         os.environ['LANGSMITH_API_KEY'] = st.secrets['LANGSMITH_API_KEY']
+        print("[DEBUG] LANGSMITH_API_KEY loaded from secrets", file=sys.stderr)
     if hasattr(st, 'secrets') and 'LANGSMITH_TRACING' in st.secrets:
         os.environ['LANGSMITH_TRACING'] = st.secrets['LANGSMITH_TRACING']
+        print(f"[DEBUG] LANGSMITH_TRACING={os.environ.get('LANGSMITH_TRACING')}", file=sys.stderr)
     if hasattr(st, 'secrets') and 'LANGSMITH_PROJECT' in st.secrets:
         os.environ['LANGSMITH_PROJECT'] = st.secrets['LANGSMITH_PROJECT']
-except:
+        print(f"[DEBUG] LANGSMITH_PROJECT={os.environ.get('LANGSMITH_PROJECT')}", file=sys.stderr)
+except Exception as e:
+    print(f"[DEBUG] Error loading secrets: {e}", file=sys.stderr)
     pass
 
 # Import langsmith BEFORE src modules (so @traceable decorator is available)
+print(f"[DEBUG] Attempting to import langsmith...", file=sys.stderr)
 try:
     from langsmith import traceable as _langsmith_traceable
     traceable = _langsmith_traceable  # Export for src modules
+    print("[DEBUG] ✓ LangSmith import successful - using real traceable", file=sys.stderr)
 except Exception as e:
     # LangSmith is optional; no-op decorator keeps tracing calls safe when it's not installed.
-    print(f"Warning: LangSmith import failed: {e}", file=sys.stderr)
+    print(f"[DEBUG] ✗ LangSmith import failed: {e}", file=sys.stderr)
     from typing import Callable, TypeVar
 
     _F = TypeVar("_F", bound=Callable[..., object])
@@ -83,6 +90,7 @@ def verify_langsmith_config():
 
 # Check config on startup (cached, runs once per session)
 _langsmith_config = verify_langsmith_config()
+print(f"[DEBUG] LangSmith Config: {_langsmith_config}", file=sys.stderr)
 
 st.set_page_config(page_title="DocuSearch", layout="wide")
 
