@@ -21,19 +21,26 @@ def _initialize_langsmith():
     """Initialize LangSmith client once per Streamlit session (survives reruns)."""
     print("[DEBUG] Initializing LangSmith...", file=sys.stderr)
     
-    # Set env vars from Streamlit secrets (ensure they're strings)
+    def _to_env_string(value):
+        """Convert any value to a proper environment variable string."""
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        return str(value) if value else ""
+    
+    # Set env vars from Streamlit secrets (ensure they're strings with proper format)
     try:
         if hasattr(st, 'secrets') and 'LANGSMITH_API_KEY' in st.secrets:
             api_key = st.secrets['LANGSMITH_API_KEY']
-            os.environ['LANGSMITH_API_KEY'] = str(api_key) if api_key else ""
+            os.environ['LANGSMITH_API_KEY'] = _to_env_string(api_key)
             print("[DEBUG] LANGSMITH_API_KEY loaded from secrets", file=sys.stderr)
         if hasattr(st, 'secrets') and 'LANGSMITH_TRACING' in st.secrets:
             tracing = st.secrets['LANGSMITH_TRACING']
-            os.environ['LANGSMITH_TRACING'] = str(tracing) if tracing else "false"
-            print(f"[DEBUG] LANGSMITH_TRACING={os.environ.get('LANGSMITH_TRACING')}", file=sys.stderr)
+            tracing_str = _to_env_string(tracing)
+            os.environ['LANGSMITH_TRACING'] = tracing_str
+            print(f"[DEBUG] LANGSMITH_TRACING={tracing_str} (was {type(tracing).__name__}: {tracing})", file=sys.stderr)
         if hasattr(st, 'secrets') and 'LANGSMITH_PROJECT' in st.secrets:
             project = st.secrets['LANGSMITH_PROJECT']
-            os.environ['LANGSMITH_PROJECT'] = str(project) if project else "default"
+            os.environ['LANGSMITH_PROJECT'] = _to_env_string(project)
             print(f"[DEBUG] LANGSMITH_PROJECT={os.environ.get('LANGSMITH_PROJECT')}", file=sys.stderr)
     except Exception as e:
         print(f"[DEBUG] Error setting env vars: {e}", file=sys.stderr)
