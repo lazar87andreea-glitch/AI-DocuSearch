@@ -68,7 +68,7 @@ from src.prompt_loader import load_prompt_with_temperature
 
 # Force LangSmith client initialization to ensure tracing is active
 try:
-    from langsmith import Client
+    from langsmith import Client, traceable as _traced_decorator
     _langsmith_client = Client()
     
     # Test connectivity by fetching projects
@@ -79,6 +79,18 @@ try:
             print(f"[DEBUG]   - {proj.name}", file=sys.stderr)
     except Exception as conn_err:
         print(f"[DEBUG] LangSmith client created but connection test failed: {conn_err}", file=sys.stderr)
+    
+    # Create a test trace to verify decorator works
+    @_traced_decorator(run_type="tool", name="langsmith_connectivity_test")
+    def _test_langsmith_trace():
+        return "test trace created"
+    
+    try:
+        result = _test_langsmith_trace()
+        print(f"[DEBUG] ✓ Test trace created: {result}", file=sys.stderr)
+    except Exception as test_err:
+        print(f"[DEBUG] ✗ Test trace failed: {test_err}", file=sys.stderr)
+        
 except Exception as e:
     print(f"[DEBUG] Could not initialize LangSmith client: {e}", file=sys.stderr)
 
