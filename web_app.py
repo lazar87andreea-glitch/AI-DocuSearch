@@ -292,15 +292,24 @@ def render_chat_history() -> None:
         return
     
     # Display conversation (reverse order so newest is at bottom)
-    st.markdown("### 💬 Conversation")
-    
-    # Responsive chat container with margins
+    # Responsive chat container with margins - works on dark mode
     st.markdown("""
     <style>
-        .chat-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 0 12px;
+        .chat-box {
+            background-color: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 12px 0;
+            min-height: 200px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        @media (prefers-color-scheme: dark) {
+            .chat-box {
+                background-color: #2d2d2d;
+                border-color: #404040;
+            }
         }
         .chat-bubble-user {
             background-color: #e3f2fd;
@@ -308,7 +317,9 @@ def render_chat_history() -> None:
             border-radius: 12px;
             margin-bottom: 12px;
             border-left: 4px solid #2196f3;
-            margin-right: 40px;
+            margin-right: 0;
+            color: #000;
+            word-wrap: break-word;
         }
         .chat-bubble-bot {
             background-color: #e8f5e9;
@@ -316,22 +327,27 @@ def render_chat_history() -> None:
             border-radius: 12px;
             margin-bottom: 12px;
             border-left: 4px solid #4caf50;
-            margin-left: 40px;
+            margin-left: 0;
+            color: #000;
+            word-wrap: break-word;
         }
         .chat-timestamp {
             font-size: 0.8em;
-            color: #666;
+            color: #555;
+            display: block;
+            margin-top: 4px;
         }
         .chat-mode-badge {
             display: inline-block;
-            background-color: #f0f0f0;
+            background-color: #ddd;
             padding: 2px 8px;
             border-radius: 4px;
-            font-size: 0.8em;
+            font-size: 0.75em;
             margin-left: 4px;
+            color: #333;
         }
     </style>
-    <div class="chat-container">
+    <div class="chat-box">
     """, unsafe_allow_html=True)
     
     # Display each conversation turn
@@ -344,7 +360,7 @@ def render_chat_history() -> None:
         # Question bubble (user - light blue)
         st.markdown(f"""
         <div class="chat-bubble-user">
-            <strong>You</strong> <span class="chat-timestamp">{timestamp}</span><br>
+            <strong>You</strong> <span class="chat-mode-badge">{timestamp}</span><br>
             {question}
         </div>
         """, unsafe_allow_html=True)
@@ -486,8 +502,6 @@ if "chat_messages" not in st.session_state:
 
 # If document is uploaded, show chat interface
 if st.session_state.document_text:
-    st.markdown("---")
-    st.markdown("### 💬 Ask Your Document")
     
     # Show conversation history
     render_chat_history()
