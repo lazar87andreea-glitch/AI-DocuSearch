@@ -266,7 +266,14 @@ def log_to_history(mode: str, question: str, result: dict, document_name: str) -
 
 
 def render_history_sidebar() -> None:
-    """Display recent questions for current document in sidebar."""
+    """Display recent questions for current document in sidebar (hidden - background tracking only)."""
+    # History is tracked but not displayed in sidebar anymore
+    # Users interact via chat interface instead
+    pass
+
+
+def render_chat_history() -> None:
+    """Display conversation history as a chat interface."""
     if not history_enabled or not st.session_state.history_manager:
         return
     
@@ -274,6 +281,7 @@ def render_history_sidebar() -> None:
     if not current_doc:
         return
     
+    # Get recent questions for this document
     history_limit = int(os.getenv("HISTORY_LIMIT", "10"))
     recent = st.session_state.history_manager.get_recent_questions(
         document_name=current_doc,
@@ -283,62 +291,41 @@ def render_history_sidebar() -> None:
     if not recent:
         return
     
-    st.sidebar.markdown("### 📋 Session History")
+    # Display conversation (reverse order so newest is at bottom)
+    st.markdown("### 💬 Conversation History")
     
-    for i, entry in enumerate(recent):
-        timestamp = entry.get("timestamp", "")[:16]  # YYYY-MM-DD HH:MM
+    for i, entry in enumerate(reversed(recent)):
+        timestamp = entry.get("timestamp", "")[:16]
         mode = entry.get("mode", "")
-        question = entry.get("question", "")[:40]
-        if len(entry.get("question", "")) > 40:
-            question += "..."
+        question = entry.get("question", "")
+        answer = entry.get("answer", "")
+        metrics = entry.get("metrics", {})
         
-        # Create a button to load this question
-        btn_label = f"[{mode}] {timestamp}\n{question}"
-        if st.sidebar.button(btn_label, key=f"history_btn_{i}", use_container_width=True):
-            st.session_state.last_question = entry.get("question", "")
-            st.session_state.selected_history_entry = entry
-            st.rerun()
-
-
-def render_chat_history() -> None:
-    """Display selected history entry as a chat bubble."""
-    if "selected_history_entry" not in st.session_state:
-        return
-    
-    entry = st.session_state.selected_history_entry
-    
-    # Create a nice chat-style display
-    st.markdown("---")
-    st.markdown("### 💬 Previous Response")
-    
-    # Question in a light blue box
-    st.markdown(f"""
-    <div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-        <strong>Q:</strong> {entry.get('question', '')}
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Answer in a light green box
-    st.markdown(f"""
-    <div style="background-color: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-        <strong>A:</strong> {entry.get('answer', '')}
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Metadata
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Mode", entry.get("mode", ""))
-    with col2:
-        st.metric("Response Time", f"{entry.get('metrics', {}).get('total_seconds', 0):.2f}s")
-    with col3:
-        st.metric("Tokens Used", entry.get('metrics', {}).get('total_tokens', 0))
-    
-    # Clear button
-    if st.button("Clear", key="clear_history_display"):
-        if "selected_history_entry" in st.session_state:
-            del st.session_state.selected_history_entry
-        st.rerun()
+        # Question bubble (user - light blue)
+        st.markdown(f"""
+        <div style="background-color: #e3f2fd; padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #2196f3;">
+            <strong>You</strong> [{timestamp}]<br>
+            {question}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Answer bubble (bot - light green)
+        st.markdown(f"""
+        <div style="background-color: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid #4caf50;">
+            <strong>DocuSearch</strong> [{mode}]<br>
+            {answer}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Show metrics in expandable
+        with st.expander(f"📊 Metrics - {metrics.get('total_seconds', 0):.2f}s, {metrics.get('total_tokens', 0)} tokens"):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Response Time", f"{metrics.get('total_seconds', 0):.2f}s")
+            with col2:
+                st.metric("Total Tokens", metrics.get('total_tokens', 0))
+            with col3:
+                st.metric("Mode", mode)
 
 
 if "file_path" not in st.session_state:
@@ -403,146 +390,67 @@ else:
 # Render history sidebar
 render_history_sidebar()
 
-question = st.text_input("Ask a question about the document")
-if question != st.session_state.last_question:
-    st.session_state.last_question = question
-    st.session_state.results = {}
+# Initialize chat history for conversation
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = []
 
-# Render chat history if a previous question was selected
-render_chat_history()
-
-can_run = bool(st.session_state.document_text) and bool(question)
-
-# On mobile, show only Direct LLM mode; on desktop, show all three modes
-if is_mobile:
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.subheader("⚡ Direct LLM Mode (Recommended for Mobile)")
-    st.markdown(
-        "Sends the entire extracted document text directly to the LLM — no chunking, "
-        "no embeddings, no retrieval step. **This works best on mobile.**"
-    )
-    if st.button("Run Direct LLM", disabled=not can_run, key="run_direct"):
-        st.info("⏳ Processing... this may take 10-30 seconds")
-        try:
-            result = run_direct(st.session_state.document_text, question)
-            st.session_state.results["Direct LLM"] = result
-            # Log to history
-            log_to_history("Direct LLM", question, result, st.session_state.get("uploaded_name", "unknown"))
-            st.success("✅ Query completed!")
-        except Exception as e:
-            error_msg = f"{type(e).__name__}: {str(e)}"
-            st.error(f"❌ **Error**: {error_msg}")
-            st.info("**Troubleshooting:**\n- Check your API key in Streamlit secrets\n- Try with a smaller document\n- Check the Streamlit Cloud logs for details")
-            print(f"[ERROR] Direct LLM failed: {error_msg}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
-    if "Direct LLM" in st.session_state.results:
-        render_result("Direct LLM", st.session_state.results["Direct LLM"])
-else:
-    # Desktop version: show all three tabs
-    tab_rag, tab_direct, tab_hybrid = st.tabs(["🔎 RAG Mode", "⚡ Direct LLM Mode", "🔀 Hybrid Mode"])
-
-    with tab_rag:
-        st.markdown(
-            "Full pipeline: chunk the document, build an embedding index, retrieve the most "
-            "relevant chunks, then ask the LLM using only that context."
+# If document is uploaded, show chat interface
+if st.session_state.document_text:
+    st.markdown("---")
+    st.markdown("### 💬 Ask Your Document")
+    
+    # Show conversation history
+    render_chat_history()
+    
+    # Chat input area
+    st.markdown("---")
+    
+    # Mode selector
+    col_mode, col_spacer = st.columns([2, 3])
+    with col_mode:
+        mode = st.radio(
+            "Select Mode:",
+            options=["Direct LLM", "RAG", "Hybrid"],
+            horizontal=True,
+            key="chat_mode_selector"
         )
-        if st.button("Run RAG", disabled=not can_run, key="run_rag"):
-            st.info("⏳ Processing... this may take 30-60 seconds (building embeddings)")
+    
+    # Chat input
+    question = st.chat_input("Ask a question about the document...", key="chat_input")
+    
+    if question:
+        # Disable RAG/Hybrid on mobile
+        if is_mobile and mode in ["RAG", "Hybrid"]:
+            st.error("❌ RAG and Hybrid modes are not available on mobile. Using Direct LLM instead.")
+            mode = "Direct LLM"
+        
+        # Show processing message
+        with st.spinner(f"⏳ Processing with {mode} mode..."):
             try:
-                result = run_rag(st.session_state.file_path, question)
-                st.session_state.results["RAG"] = result
+                # Execute the appropriate mode
+                if mode == "Direct LLM":
+                    result = run_direct(st.session_state.document_text, question)
+                elif mode == "RAG":
+                    result = run_rag(st.session_state.file_path, question)
+                elif mode == "Hybrid":
+                    result = run_hybrid(st.session_state.file_path, st.session_state.document_text, question)
+                
                 # Log to history
-                log_to_history("RAG", question, result, st.session_state.get("uploaded_name", "unknown"))
-                st.success("✅ RAG completed!")
-            except Exception as e:
-                error_msg = f"{type(e).__name__}: {str(e)}"
-                st.error(f"❌ **Error in RAG mode**: {error_msg}")
-                print(f"[ERROR] RAG failed: {error_msg}", file=sys.stderr)
-                import traceback
-                traceback.print_exc()
-        if "RAG" in st.session_state.results:
-            render_result("RAG", st.session_state.results["RAG"])
-
-    with tab_direct:
-        st.markdown(
-            "Sends the entire extracted document text directly to the LLM — no chunking, "
-            "no embeddings, no retrieval step."
-        )
-        if st.button("Run Direct LLM", disabled=not can_run, key="run_direct_desktop"):
-            st.info("⏳ Processing... this may take 10-30 seconds")
-            try:
-                result = run_direct(st.session_state.document_text, question)
-                st.session_state.results["Direct LLM"] = result
-                # Log to history
-                log_to_history("Direct LLM", question, result, st.session_state.get("uploaded_name", "unknown"))
-                st.success("✅ Query completed!")
+                log_to_history(mode, question, result, st.session_state.get("uploaded_name", "unknown"))
+                
+                # Add to chat display (will show on next render)
+                st.success(f"✅ {mode} completed!")
+                st.rerun()
+                
             except Exception as e:
                 error_msg = f"{type(e).__name__}: {str(e)}"
                 st.error(f"❌ **Error**: {error_msg}")
                 st.info("**Troubleshooting:**\n- Check your API key in Streamlit secrets\n- Try with a smaller document\n- Check the Streamlit Cloud logs for details")
-                print(f"[ERROR] Direct LLM failed: {error_msg}", file=sys.stderr)
+                print(f"[ERROR] {mode} failed: {error_msg}", file=sys.stderr)
                 import traceback
                 traceback.print_exc()
-        if "Direct LLM" in st.session_state.results:
-            render_result("Direct LLM", st.session_state.results["Direct LLM"])
 
-    with tab_hybrid:
-        st.markdown(
-            "Tries the full RAG pipeline first; automatically falls back to Direct LLM mode "
-            "if the embedding pipeline fails (e.g. low memory or a missing dependency)."
-        )
-        if st.button("Run Hybrid", disabled=not can_run, key="run_hybrid"):
-            st.info("⏳ Processing... trying RAG, will fallback to Direct LLM if needed")
-            try:
-                result = run_hybrid(
-                    st.session_state.file_path, st.session_state.document_text, question
-                )
-                st.session_state.results["Hybrid"] = result
-                # Log to history
-                log_to_history("Hybrid", question, result, st.session_state.get("uploaded_name", "unknown"))
-                st.success("✅ Hybrid completed!")
-            except Exception as e:
-                error_msg = f"{type(e).__name__}: {str(e)}"
-                st.error(f"❌ **Error in Hybrid mode**: {error_msg}")
-                print(f"[ERROR] Hybrid failed: {error_msg}", file=sys.stderr)
-                import traceback
-                traceback.print_exc()
-        if "Hybrid" in st.session_state.results:
-            render_result("Hybrid", st.session_state.results["Hybrid"])
-
-if len(st.session_state.results) > (1 if is_mobile else 1):
-    if not is_mobile:  # Only show comparison on desktop
-        st.markdown("---")
-        if "show_comparison" not in st.session_state:
-            st.session_state.show_comparison = False
-        compare_label = "📊 Hide mode comparison" if st.session_state.show_comparison else "📊 Show mode comparison"
-        if st.button(compare_label, key="toggle_comparison"):
-            st.session_state.show_comparison = not st.session_state.show_comparison
-
-        if st.session_state.show_comparison:
-            st.subheader("Compare modes")
-            rows = []
-            for mode_name, r in st.session_state.results.items():
-                rows.append(
-                    {
-                        "Mode": mode_name,
-                        "Total time (s)": round(r["total_seconds"], 2),
-                        "Chunks used": r["chunk_count"],
-                        "Context chars": r["context_chars"],
-                        "Temperature": r["temperature"],
-                        "Prompt tokens": r["prompt_tokens"],
-                        "Completion tokens": r["completion_tokens"],
-                        "Total tokens": r["total_tokens"],
-                        "Tokens estimated?": "Yes" if r["estimated_tokens"] else "No",
-                        "Live API": "Yes" if r["used_live_api"] else "No",
-                    }
-                )
-            st.dataframe(rows, use_container_width=True, hide_index=True)
-
-# st.markdown("---")
-# st.markdown(
-    # "**Safe default**: RAG/Hybrid mode automatically falls back to lightweight keyword search "
-    # "if embedding models can't be loaded, so the app never crashes the browser."
-# )
+else:
+    # No document uploaded yet
+    question = None
+    can_run = False
