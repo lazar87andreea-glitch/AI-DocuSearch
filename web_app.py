@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Load LangSmith credentials from Streamlit secrets (for Streamlit Cloud deployment)
+# Load LangSmith credentials from Streamlit secrets BEFORE importing modules that use @traceable
 try:
     if hasattr(st, 'secrets') and 'LANGSMITH_API_KEY' in st.secrets:
         os.environ['LANGSMITH_API_KEY'] = st.secrets['LANGSMITH_API_KEY']
@@ -26,6 +26,21 @@ try:
 except:
     pass
 
+# Import langsmith BEFORE src modules (so @traceable decorator is available)
+try:
+    from langsmith import traceable
+except Exception:
+    # LangSmith is optional; no-op decorator keeps tracing calls safe when it's not installed.
+    from typing import Callable, TypeVar
+
+    _F = TypeVar("_F", bound=Callable[..., object])
+
+    def traceable(*_args, **_kwargs) -> Callable[[_F], _F]:
+        def _decorator(fn: _F) -> _F:
+            return fn
+        return _decorator
+
+# NOW import src modules (they will use the traceable decorator with env vars already set)
 from src.ingest import extract_text
 from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
@@ -44,18 +59,25 @@ def is_mobile_browser():
     except:
         return False
 
-try:
-    from langsmith import traceable
-except Exception:
-    # LangSmith is optional; no-op decorator keeps tracing calls safe when it's not installed.
-    from typing import Callable, TypeVar
+# Verify LangSmith configuration on app startup
+@st.cache_resource
+def verify_langsmith_config():
+    """Cache and verify LangSmith configuration once per app session."""
+    api_key = os.environ.get('LANGSMITH_API_KEY')
+    tracing = os.environ.get('LANGSMITH_TRACING')
+    project = os.environ.get('LANGSMITH_PROJECT')
+    
+    is_configured = bool(api_key and tracing == 'true')
+    
+    return {
+        'api_key_set': bool(api_key),
+        'tracing_enabled': tracing == 'true',
+        'project': project or 'default',
+        'is_configured': is_configured
+    }
 
-    _F = TypeVar("_F", bound=Callable[..., object])
-
-    def traceable(*_args, **_kwargs) -> Callable[[_F], _F]:
-        def _decorator(fn: _F) -> _F:
-            return fn
-        return _decorator
+# Check config on startup (cached, runs once per session)
+_langsmith_config = verify_langsmith_config()
 
 st.set_page_config(page_title="DocuSearch", layout="wide")
 
