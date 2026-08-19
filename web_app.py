@@ -186,25 +186,44 @@ if "last_question" not in st.session_state:
 
 uploaded = st.file_uploader("Upload a PDF, DOCX or TXT file", type=["pdf", "docx", "txt"])
 
-if uploaded is not None and st.session_state.get("uploaded_name") != uploaded.name:
-    st.session_state.uploaded_name = uploaded.name
-    st.session_state.file_path = save_uploaded(uploaded)
-    st.session_state.results = {}
-    with st.spinner("Extracting document text..."):
-        t0 = time.perf_counter()
+if uploaded is not None:
+    if st.session_state.get("uploaded_name") != uploaded.name:
+        st.session_state.uploaded_name = uploaded.name
+        st.session_state.results = {}
+        
+        # Save file
         try:
-            st.session_state.document_text = extract_text(st.session_state.file_path)
-            st.session_state.extraction_seconds = time.perf_counter() - t0
+            st.session_state.file_path = save_uploaded(uploaded)
+            st.info(f"📁 File saved: {uploaded.name} ({uploaded.size} bytes)")
         except Exception as e:
-            st.error(f"Failed to extract text: {e}")
+            st.error(f"❌ Failed to save file: {e}")
             st.session_state.document_text = None
-
-if st.session_state.document_text:
-    size_mb = len(st.session_state.document_text) / (1024 * 1024)
-    st.success(
-        f"✓ Extracted {len(st.session_state.document_text)} chars ({size_mb:.2f} MB) "
-        f"in {st.session_state.extraction_seconds:.2f}s"
-    )
+            st.session_state.file_path = None
+            import traceback
+            traceback.print_exc()
+        
+        # Extract text
+        if st.session_state.file_path:
+            st.info("⏳ Extracting text from document...")
+            t0 = time.perf_counter()
+            try:
+                st.session_state.document_text = extract_text(st.session_state.file_path)
+                st.session_state.extraction_seconds = time.perf_counter() - t0
+                size_mb = len(st.session_state.document_text) / (1024 * 1024)
+                st.success(
+                    f"✅ Extracted {len(st.session_state.document_text)} chars ({size_mb:.2f} MB) "
+                    f"in {st.session_state.extraction_seconds:.2f}s"
+                )
+            except Exception as e:
+                st.error(f"❌ Failed to extract text: {type(e).__name__}: {e}")
+                st.session_state.document_text = None
+                print(f"[ERROR] Text extraction failed: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc()
+else:
+    # No file uploaded yet - show helpful message
+    if "uploaded_name" not in st.session_state:
+        st.info("👆 Please upload a document to get started")
 
 question = st.text_input("Ask a question about the document")
 if question != st.session_state.last_question:
@@ -217,10 +236,18 @@ can_run = bool(st.session_state.document_text) and bool(question)
 with st.sidebar:
     st.write("### Debug Info")
     st.write(f"📄 Document loaded: {'✅ Yes' if st.session_state.document_text else '❌ No'}")
+    if st.session_state.document_text:
+        st.write(f"   - Size: {len(st.session_state.document_text)} chars")
     st.write(f"❓ Question entered: {'✅ Yes' if question else '❌ No'}")
     st.write(f"🔑 API key set: {'✅ Yes' if os.environ.get('OPENAI_API_KEY') else '❌ No (check Streamlit secrets)'}")
     st.write(f"📱 Mobile mode: {'✅ On' if is_mobile else '❌ Off'}")
     st.write(f"🟢 Can run: {'✅ Yes' if can_run else '❌ No'}")
+    
+    # Show file path for debugging
+    if st.session_state.get("file_path"):
+        st.write(f"📂 File path: {st.session_state.file_path}")
+    if st.session_state.get("uploaded_name"):
+        st.write(f"📋 Uploaded: {st.session_state.uploaded_name}")
 
 # On mobile, show only Direct LLM mode; on desktop, show all three modes
 if is_mobile:
