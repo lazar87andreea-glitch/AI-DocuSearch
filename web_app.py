@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import time
+import re
 
 # Prevent OpenBLAS/NumPy memory issues on low-memory machines.
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
@@ -19,6 +20,19 @@ from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
 from src.prompt_loader import load_prompt_with_temperature
 
+# Mobile detection helper
+def is_mobile_browser():
+    """Detect if user is on a mobile device."""
+    try:
+        user_agent = st.query_params.get("_user_agent", "")
+        if not user_agent:
+            # Fallback: check if we're in a mobile context
+            user_agent = os.environ.get("HTTP_USER_AGENT", "")
+        mobile_patterns = r"(android|iphone|ipad|mobile|webos|blackberry|opera mini)"
+        return bool(re.search(mobile_patterns, user_agent.lower()))
+    except:
+        return False
+
 try:
     from langsmith import traceable
 except Exception:
@@ -32,7 +46,16 @@ except Exception:
             return fn
         return _decorator
 
-st.set_page_config(page_title="DocuSearch", layout="centered")
+st.set_page_config(page_title="DocuSearch", layout="wide")
+
+# Check if on mobile
+is_mobile = is_mobile_browser()
+if is_mobile:
+    st.warning(
+        "📱 **Mobile detected**: RAG mode (with embeddings) is disabled on mobile due to resource constraints "
+        "on Streamlit Cloud. Use **Direct LLM** mode instead — it works on all devices!"
+    )
+
 st.title("DocuSearch")
 st.markdown(
     "Upload a document, ask a question, then run **RAG**, **Direct LLM**, and **Hybrid** "
@@ -99,12 +122,20 @@ def run_hybrid(file_path: str, document_text: str, question: str) -> dict:
 
 
 def render_metrics(result: dict):
-    cols = st.columns(4)
+    """Render metrics with responsive layout (2 cols on mobile, 4 on desktop)."""
+    num_cols = 2 if is_mobile else 4
+    cols = st.columns(num_cols)
     cols[0].metric("Total time", f"{result['total_seconds']:.2f}s")
     cols[1].metric("Chunks used", result["chunk_count"])
-    cols[2].metric("Context size", f"{result['context_chars']:,} chars")
-    tok_label = "Tokens (est.)" if result["estimated_tokens"] else "Tokens (actual)"
-    cols[3].metric(tok_label, f"{result['total_tokens']:,}")
+    if num_cols == 4:
+        cols[2].metric("Context size", f"{result['context_chars']:,} chars")
+        tok_label = "Tokens (est.)" if result["estimated_tokens"] else "Tokens (actual)"
+        cols[3].metric(tok_label, f"{result['total_tokens']:,}")
+    else:
+        # On mobile, show in second row
+        cols[0].metric("Context size", f"{result['context_chars']:,} chars")
+        tok_label = "Tokens (est.)" if result["estimated_tokens"] else "Tokens (actual)"
+        cols[1].metric(tok_label, f"{result['total_tokens']:,}")
 
     with st.expander("Detailed timing & tokens"):
         st.write(f"- Build/index time: {result['build_seconds']:.2f}s")
@@ -176,73 +207,103 @@ if question != st.session_state.last_question:
 
 can_run = bool(st.session_state.document_text) and bool(question)
 
-tab_rag, tab_direct, tab_hybrid = st.tabs(["🔎 RAG Mode", "⚡ Direct LLM Mode", "🔀 Hybrid Mode"])
-
-with tab_rag:
+# On mobile, show only Direct LLM mode; on desktop, show all three modes
+if is_mobile:
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.subheader("⚡ Direct LLM Mode (Recommended for Mobile)")
     st.markdown(
-        "Full pipeline: chunk the document, build an embedding index, retrieve the most "
-        "relevant chunks, then ask the LLM using only that context."
-    )
-    if st.button("Run RAG", disabled=not can_run, key="run_rag"):
-        with st.spinner("Building index and retrieving..."):
-            try:
-                st.session_state.results["RAG"] = run_rag(st.session_state.file_path, question)
-            except Exception as e:
-                st.error(f"RAG mode failed: {type(e).__name__}: {e}")
-    if "RAG" in st.session_state.results:
-        render_result("RAG", st.session_state.results["RAG"])
-
-with tab_direct:
-    st.markdown(
-        "Sends the entire extracted document text directly to the LLM \u2014 no chunking, "
-        "no embeddings, no retrieval step."
+        "Sends the entire extracted document text directly to the LLM — no chunking, "
+        "no embeddings, no retrieval step. **This works best on mobile.**"
     )
     if st.button("Run Direct LLM", disabled=not can_run, key="run_direct"):
         with st.spinner("Asking the LLM..."):
-            st.session_state.results["Direct LLM"] = run_direct(st.session_state.document_text, question)
+            try:
+                st.session_state.results["Direct LLM"] = run_direct(st.session_state.document_text, question)
+            except Exception as e:
+                st.error(f"❌ **Error**: {type(e).__name__}: {e}\n\nCheck that your API key is valid and the document is readable.")
+                print(f"[ERROR] Direct LLM failed: {e}", file=sys.stderr)
     if "Direct LLM" in st.session_state.results:
         render_result("Direct LLM", st.session_state.results["Direct LLM"])
+else:
+    # Desktop version: show all three tabs
+    tab_rag, tab_direct, tab_hybrid = st.tabs(["🔎 RAG Mode", "⚡ Direct LLM Mode", "🔀 Hybrid Mode"])
 
-with tab_hybrid:
-    st.markdown(
-        "Tries the full RAG pipeline first; automatically falls back to Direct LLM mode "
-        "if the embedding pipeline fails (e.g. low memory or a missing dependency)."
-    )
-    if st.button("Run Hybrid", disabled=not can_run, key="run_hybrid"):
-        with st.spinner("Running hybrid pipeline..."):
-            st.session_state.results["Hybrid"] = run_hybrid(
-                st.session_state.file_path, st.session_state.document_text, question
-            )
-    if "Hybrid" in st.session_state.results:
-        render_result("Hybrid", st.session_state.results["Hybrid"])
+    with tab_rag:
+        st.markdown(
+            "Full pipeline: chunk the document, build an embedding index, retrieve the most "
+            "relevant chunks, then ask the LLM using only that context."
+        )
+        if st.button("Run RAG", disabled=not can_run, key="run_rag"):
+            with st.spinner("Building index and retrieving..."):
+                try:
+                    st.session_state.results["RAG"] = run_rag(st.session_state.file_path, question)
+                except Exception as e:
+                    st.error(f"❌ **Error in RAG mode**: {type(e).__name__}: {e}")
+                    print(f"[ERROR] RAG failed: {e}", file=sys.stderr)
+        if "RAG" in st.session_state.results:
+            render_result("RAG", st.session_state.results["RAG"])
 
-if len(st.session_state.results) > 1:
-    st.markdown("---")
-    if "show_comparison" not in st.session_state:
-        st.session_state.show_comparison = False
-    compare_label = "📊 Hide mode comparison" if st.session_state.show_comparison else "📊 Show mode comparison"
-    if st.button(compare_label, key="toggle_comparison"):
-        st.session_state.show_comparison = not st.session_state.show_comparison
+    with tab_direct:
+        st.markdown(
+            "Sends the entire extracted document text directly to the LLM — no chunking, "
+            "no embeddings, no retrieval step."
+        )
+        if st.button("Run Direct LLM", disabled=not can_run, key="run_direct"):
+            with st.spinner("Asking the LLM..."):
+                try:
+                    st.session_state.results["Direct LLM"] = run_direct(st.session_state.document_text, question)
+                except Exception as e:
+                    st.error(f"❌ **Error**: {type(e).__name__}: {e}")
+                    print(f"[ERROR] Direct LLM failed: {e}", file=sys.stderr)
+        if "Direct LLM" in st.session_state.results:
+            render_result("Direct LLM", st.session_state.results["Direct LLM"])
 
-    if st.session_state.show_comparison:
-        st.subheader("Compare modes")
-        rows = []
-        for mode_name, r in st.session_state.results.items():
-            rows.append(
-                {
-                    "Mode": mode_name,
-                    "Total time (s)": round(r["total_seconds"], 2),
-                    "Chunks used": r["chunk_count"],
-                    "Context chars": r["context_chars"],
-                    "Temperature": r["temperature"],
-                    "Prompt tokens": r["prompt_tokens"],
-                    "Completion tokens": r["completion_tokens"],
-                    "Total tokens": r["total_tokens"],
-                    "Tokens estimated?": "Yes" if r["estimated_tokens"] else "No",
-                    "Live API": "Yes" if r["used_live_api"] else "No",
-                }
-            )
-        st.dataframe(rows, use_container_width=True, hide_index=True)
+    with tab_hybrid:
+        st.markdown(
+            "Tries the full RAG pipeline first; automatically falls back to Direct LLM mode "
+            "if the embedding pipeline fails (e.g. low memory or a missing dependency)."
+        )
+        if st.button("Run Hybrid", disabled=not can_run, key="run_hybrid"):
+            with st.spinner("Running hybrid pipeline..."):
+                try:
+                    st.session_state.results["Hybrid"] = run_hybrid(
+                        st.session_state.file_path, st.session_state.document_text, question
+                    )
+                except Exception as e:
+                    st.error(f"❌ **Error in Hybrid mode**: {type(e).__name__}: {e}")
+                    print(f"[ERROR] Hybrid failed: {e}", file=sys.stderr)
+        if "Hybrid" in st.session_state.results:
+            render_result("Hybrid", st.session_state.results["Hybrid"])
+
+if len(st.session_state.results) > (1 if is_mobile else 1):
+    if not is_mobile:  # Only show comparison on desktop
+        st.markdown("---")
+        if "show_comparison" not in st.session_state:
+            st.session_state.show_comparison = False
+        compare_label = "📊 Hide mode comparison" if st.session_state.show_comparison else "📊 Show mode comparison"
+        if st.button(compare_label, key="toggle_comparison"):
+            st.session_state.show_comparison = not st.session_state.show_comparison
+
+        if st.session_state.show_comparison:
+            st.subheader("Compare modes")
+            rows = []
+            for mode_name, r in st.session_state.results.items():
+                rows.append(
+                    {
+                        "Mode": mode_name,
+                        "Total time (s)": round(r["total_seconds"], 2),
+                        "Chunks used": r["chunk_count"],
+                        "Context chars": r["context_chars"],
+                        "Temperature": r["temperature"],
+                        "Prompt tokens": r["prompt_tokens"],
+                        "Completion tokens": r["completion_tokens"],
+                        "Total tokens": r["total_tokens"],
+                        "Tokens estimated?": "Yes" if r["estimated_tokens"] else "No",
+                        "Live API": "Yes" if r["used_live_api"] else "No",
+                    }
+                )
+            st.dataframe(rows, use_container_width=True, hide_index=True)
 
 # st.markdown("---")
 # st.markdown(
