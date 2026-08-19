@@ -31,8 +31,10 @@ def _initialize_langsmith():
     try:
         if hasattr(st, 'secrets'):
             for key, value in st.secrets.items():
-                os.environ[key] = _to_env_string(value)
-                print(f"[DEBUG] Loaded secret: {key}", file=sys.stderr)
+                converted = _to_env_string(value)
+                os.environ[key] = converted
+                if 'LANGSMITH' in key or 'LLM' in key:
+                    print(f"[DEBUG] {key}: {type(value).__name__}={repr(value)} -> {repr(converted)}", file=sys.stderr)
     except Exception as e:
         print(f"[DEBUG] Error loading secrets: {e}", file=sys.stderr)
     
@@ -92,6 +94,8 @@ def verify_langsmith_config():
     api_key = os.environ.get('LANGSMITH_API_KEY')
     tracing = os.environ.get('LANGSMITH_TRACING')
     project = os.environ.get('LANGSMITH_PROJECT')
+    
+    print(f"[DEBUG] Verifying config: LANGSMITH_TRACING={repr(tracing)} (type: {type(tracing).__name__}, len: {len(tracing) if tracing else 0})", file=sys.stderr)
     
     is_configured = bool(api_key and tracing == 'true')
     
