@@ -15,9 +15,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Load LangSmith credentials from Streamlit secrets BEFORE importing modules that use @traceable
-print("[DEBUG] Setting up LangSmith credentials...", file=sys.stderr)
-try:
+# Initialize LangSmith with Streamlit's caching model
+@st.cache_resource
+def _initialize_langsmith():
+    """Initialize LangSmith client once per Streamlit session (survives reruns)."""
+    print("[DEBUG] Initializing LangSmith...", file=sys.stderr)
+    
+    # Set env vars from Streamlit secrets
     if hasattr(st, 'secrets') and 'LANGSMITH_API_KEY' in st.secrets:
         os.environ['LANGSMITH_API_KEY'] = st.secrets['LANGSMITH_API_KEY']
         print("[DEBUG] LANGSMITH_API_KEY loaded from secrets", file=sys.stderr)
@@ -27,36 +31,42 @@ try:
     if hasattr(st, 'secrets') and 'LANGSMITH_PROJECT' in st.secrets:
         os.environ['LANGSMITH_PROJECT'] = st.secrets['LANGSMITH_PROJECT']
         print(f"[DEBUG] LANGSMITH_PROJECT={os.environ.get('LANGSMITH_PROJECT')}", file=sys.stderr)
-except Exception as e:
-    print(f"[DEBUG] Error loading secrets: {e}", file=sys.stderr)
-    pass
+    
+    # Now import langsmith with environment properly configured
+    try:
+        from langsmith import traceable as _langsmith_traceable
+        print("[DEBUG] ✓ LangSmith import successful", file=sys.stderr)
+        return _langsmith_traceable
+    except Exception as e:
+        print(f"[DEBUG] ✗ LangSmith import failed: {e}", file=sys.stderr)
+        # Return no-op decorator as fallback
+        from typing import Callable, TypeVar
+        _F = TypeVar("_F", bound=Callable[..., object])
+        
+        def _noop_traceable(*_args, **_kwargs):
+            def _decorator(fn: _F) -> _F:
+                return fn
+            return _decorator
+        return _noop_traceable
 
-# Import langsmith BEFORE src modules (so @traceable decorator is available)
-print(f"[DEBUG] Attempting to import langsmith...", file=sys.stderr)
-try:
-    from langsmith import traceable as _langsmith_traceable
-    traceable = _langsmith_traceable  # Export for src modules
-    print("[DEBUG] ✓ LangSmith import successful - using real traceable", file=sys.stderr)
-except Exception as e:
-    # LangSmith is optional; no-op decorator keeps tracing calls safe when it's not installed.
-    print(f"[DEBUG] ✗ LangSmith import failed: {e}", file=sys.stderr)
-    from typing import Callable, TypeVar
+# Initialize LangSmith (cached per session, survives reruns)
+traceable = _initialize_langsmith()
 
-    _F = TypeVar("_F", bound=Callable[..., object])
+print("[DEBUG] Importing src modules...", file=sys.stderr)
 
-    def traceable(*_args, **_kwargs) -> Callable[[_F], _F]:
-        def _decorator(fn: _F) -> _F:
-            return fn
-        return _decorator
-
-# Export traceable to sys.modules so src modules can import it from web_app
-sys.modules[__name__].traceable = traceable
-
-# NOW import src modules (they will use the traceable decorator with env vars already set)
+# NOW import src modules (they will use traceable decorator with env vars set)
 from src.ingest import extract_text
 from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
 from src.prompt_loader import load_prompt_with_temperature
+
+# Force LangSmith client initialization to ensure tracing is active
+try:
+    from langsmith import Client
+    _langsmith_client = Client()
+    print(f"[DEBUG] LangSmith client initialized - tracing active", file=sys.stderr)
+except Exception as e:
+    print(f"[DEBUG] Could not initialize LangSmith client: {e}", file=sys.stderr)
 
 # Mobile detection helper
 def is_mobile_browser():
