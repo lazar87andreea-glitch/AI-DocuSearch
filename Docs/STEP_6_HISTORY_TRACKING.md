@@ -1,7 +1,7 @@
 # Step 6: Question History Tracking & Multi-User Isolation
 
 ## Overview
-Implement persistent per-user question history with document filtering, session isolation, and multi-user support. Each browser session maintains its own private history file, with automatic cleanup and a CLI tool for analytics. Complete metrics (tokens, timing, retrieval performance) are stored for each question.
+Implement persistent per-user question history with document filtering, session isolation, and multi-user support. Each browser session maintains its own private history file, with automatic cleanup and a CLI tool for analytics. Complete metrics (tokens, timing, retrieval performance) are stored internally for each question for future analytics capability.
 
 ## Purpose
 - Track all user questions and answers for a session

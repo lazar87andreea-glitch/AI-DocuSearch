@@ -134,12 +134,7 @@ pip install -r requirements.txt
 python -m streamlit run web_app.py
 ```
 
-After uploading a document and entering a question, use the **RAG Mode**, **Direct LLM Mode**, and
-**Hybrid Mode** tabs to run and compare each approach. Each answer has a **📊 Show metrics** button
-underneath (hidden by default) that reveals total time, a build/retrieval/generation time
-breakdown, chunk count, context size, and prompt/completion/total token counts (real `usage` data
-from the provider when available, otherwise an estimate). A **📊 Show mode comparison** button
-appears once two or more modes have been run, revealing a side-by-side table.
+After uploading a document and entering a question, select your preferred mode (**Direct LLM**, **RAG**, or **Hybrid**) and submit. The answer appears in the conversation thread instantly.
 
 ## Example usage
 
@@ -169,14 +164,11 @@ Responsible for generating embeddings and searching the document space for relev
 
 ### `src/ai_query.py`
 Responsible for calling the configured LLM provider's chat completions API (any OpenAI-compatible
-endpoint, e.g. OpenAI, xAI/Grok, Groq) and returning the model response. Also exposes
-`generate_answer_with_meta()`, which additionally reports elapsed time and prompt/completion/total
-token counts (used by the web app's per-mode metrics).
+endpoint, e.g. OpenAI, xAI/Grok, Groq) and returning the model response.
 
 ### `src/pipeline.py`
 Responsible for coordinating the whole flow and deciding whether to use the full RAG path or the
-fallback path. `answer_question()` returns timing (retrieval/generation/total seconds), chunk
-count, context size, and token metrics alongside the answer.
+fallback path. `answer_question()` returns the answer and supporting metadata.
 
 ### `src/prompt_loader.py`
 Responsible for loading prompt templates from the `prompts/` folder and filling in their

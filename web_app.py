@@ -127,8 +127,8 @@ if is_mobile:
 
 st.title("DocuSearch")
 st.markdown(
-    "Don't remember what a document is all about? Click Upload button, wait to load, ask a question "
-    "then run in it one or all the options below to see the response. Metrics (speed, retrieval, token usage) are optional — click Show metrics under any answer to reveal them"
+    "Don't remember what a document is all about? Upload your document, ask a question, "
+    "and get instant answers using AI."
 )
 
 

@@ -130,8 +130,7 @@ HISTORY_LIMIT = "10"
    - Answer appears in the conversation thread below
 
 3. **View conversation history**
-   - Previous questions and answers appear above the chat input
-   - Click "📊 Metrics" on any response to see performance details (response time, tokens, etc.)
+   - Previous questions and answers appear in the chat area
    - History persists for the current browser session
 
 ### 4.2: Test LangSmith Integration (Optional)
@@ -160,7 +159,6 @@ Then in the deployed app, ask a question. Check your [LangSmith dashboard](https
 - **Desktop browsers** (Chrome, Firefox, Safari, Edge)
   - ✅ Chat interface with all three modes (RAG, Direct LLM, Hybrid)
   - ✅ Conversation history with timestamps
-  - ✅ Expandable metrics for each response
   - ✅ Wide layout for readability
 
 - **Mobile browsers** (Android, iOS)
