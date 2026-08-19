@@ -214,6 +214,13 @@ if uploaded is not None:
                     f"✅ Extracted {len(st.session_state.document_text)} chars ({size_mb:.2f} MB) "
                     f"in {st.session_state.extraction_seconds:.2f}s"
                 )
+            except RuntimeError as e:
+                # OCR-related errors
+                st.warning(f"⚠️ **Note on scanned PDFs**: {e}")
+                st.info("📌 **Tip**: For best results, use PDFs with selectable text (not scanned images). "
+                       "If you have a scanned PDF in a non-English language, OCR may need configuration.")
+                st.session_state.document_text = None
+                print(f"[WARNING] Text extraction (OCR): {e}", file=sys.stderr)
             except Exception as e:
                 st.error(f"❌ Failed to extract text: {type(e).__name__}: {e}")
                 st.session_state.document_text = None
