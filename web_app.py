@@ -48,12 +48,18 @@ except Exception:
 
 st.set_page_config(page_title="DocuSearch", layout="wide")
 
+# Manual mobile toggle in sidebar (for debugging + manual override)
+with st.sidebar:
+    st.write("### Device Settings")
+    force_mobile = st.checkbox("📱 Force mobile mode (for testing)")
+
 # Check if on mobile
-is_mobile = is_mobile_browser()
+is_mobile = force_mobile or is_mobile_browser()
+
 if is_mobile:
     st.warning(
-        "📱 **Mobile detected**: RAG mode (with embeddings) is disabled on mobile due to resource constraints "
-        "on Streamlit Cloud. Use **Direct LLM** mode instead — it works on all devices!"
+        "📱 **Mobile Mode Active**: RAG & Hybrid modes disabled. Use **Direct LLM** mode instead — "
+        "it's fast and works on all devices!"
     )
 
 st.title("DocuSearch")
