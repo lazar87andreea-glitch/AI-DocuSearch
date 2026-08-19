@@ -73,6 +73,22 @@ def generate_answer_with_meta(
     if api_key and base_url and resolved_model:
         try:
             import requests
+            
+            # Wrap the LLM API call in a LangSmith trace
+            try:
+                from langsmith import Client
+                _ls_client = Client()
+                
+                # Create a run for this LLM call
+                run = _ls_client.create_run(
+                    name="generate_answer",
+                    run_type="llm",
+                    inputs={"prompt": prompt},
+                )
+                print(f"[LANGSMITH] Created run: {run.id}", file=sys.stderr)
+            except Exception as ls_err:
+                print(f"[LANGSMITH] Could not create LangSmith run: {ls_err}", file=sys.stderr)
+                run = None
 
             payload = {
                 "model": resolved_model,
@@ -95,6 +111,14 @@ def generate_answer_with_meta(
             data = resp.json()
             answer = data["choices"][0]["message"]["content"]
             print(f"[AI_QUERY] SUCCESS: Got answer from LLM API", file=sys.stderr)
+            
+            # End the LangSmith run successfully
+            if run:
+                try:
+                    _ls_client.end_run(run.id, outputs={"answer": answer})
+                    print(f"[LANGSMITH] Ended run successfully: {run.id}", file=sys.stderr)
+                except Exception as end_err:
+                    print(f"[LANGSMITH] Could not end LangSmith run: {end_err}", file=sys.stderr)
 
             usage = data.get("usage") or {}
             prompt_tokens = usage.get("prompt_tokens")
@@ -122,6 +146,14 @@ def generate_answer_with_meta(
             print(f"[AI_QUERY] ERROR: {type(e).__name__}: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc(file=sys.stderr)
+            
+            # End the LangSmith run with error
+            if 'run' in locals() and run:
+                try:
+                    _ls_client.end_run(run.id, error=str(e))
+                    print(f"[LANGSMITH] Ended run with error: {run.id}", file=sys.stderr)
+                except Exception as end_err:
+                    print(f"[LANGSMITH] Could not end LangSmith run: {end_err}", file=sys.stderr)
     else:
         print(f"[AI_QUERY] MISSING CONFIG: api_key={bool(api_key)}, base_url={bool(base_url)}, model={bool(resolved_model)}", file=sys.stderr)
 
