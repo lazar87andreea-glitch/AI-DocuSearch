@@ -26,11 +26,15 @@ def _estimate_tokens(text: str) -> int:
     return max(0, len(text) // 4) if text else 0
 
 
-@traceable(run_type="llm", name="generate_answer")
 def generate_answer_with_meta(
     prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
 ) -> Dict[str, Any]:
-    """Same resolution/request logic as generate_answer, plus timing and token metrics."""
+    """Same resolution/request logic as generate_answer, plus timing and token metrics.
+    
+    Uses manual LangSmith Client tracing (create_run/end_run) instead of @traceable decorator
+    to ensure outputs are properly captured. The decorator approach conflicts with manual
+    tracing and causes "No outputs" in LangSmith dashboard.
+    """
     start = time.perf_counter()
 
     resolved_temperature = temperature

@@ -245,7 +245,7 @@ def render_result(mode_key: str, result: dict):
 
 
 def log_to_history(mode: str, question: str, result: dict, document_name: str) -> None:
-    """Log a query to history after it completes."""
+    """Log a query to history both in-memory and to disk."""
     if not history_enabled or not st.session_state.history_manager:
         return
     
@@ -262,7 +262,24 @@ def log_to_history(mode: str, question: str, result: dict, document_name: str) -
             "temperature": result.get("temperature", 0.2),
         }
         
-        # Log to history
+        # Create history entry with timestamp
+        from datetime import datetime
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "question": question,
+            "answer": result.get("raw_answer", ""),
+            "mode": mode,
+            "document_name": document_name,
+            "metrics": metrics_dict,
+        }
+        
+        # Add to in-memory session state (for instant display in chat)
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+        st.session_state.chat_history.append(entry)
+        print(f"[HISTORY] Added to session state: {len(st.session_state.chat_history)} entries", file=sys.stderr)
+        
+        # Log to disk history (for analytics/CLI)
         st.session_state.history_manager.add_question(
             question=question,
             answer=result.get("raw_answer", ""),
@@ -282,23 +299,24 @@ def render_history_sidebar() -> None:
 
 
 def render_chat_history() -> None:
-    """Display conversation history with left/right aligned bubbles and avatars."""
-    if not history_enabled or not st.session_state.history_manager:
+    """Display conversation history from in-memory session state with left/right aligned bubbles."""
+    # Use session state first (always available in current session)
+    if "chat_history" not in st.session_state or not st.session_state.chat_history:
         return
     
+    # Get current document filter
     current_doc = st.session_state.get("uploaded_name", None)
-    if not current_doc:
-        return
     
-    # Get recent questions for this document
-    history_limit = int(os.getenv("HISTORY_LIMIT", "10"))
-    recent = st.session_state.history_manager.get_recent_questions(
-        document_name=current_doc,
-        limit=history_limit
-    )
+    # Filter history by current document if needed
+    recent = [
+        entry for entry in st.session_state.chat_history
+        if entry.get("document_name") == current_doc
+    ]
     
     if not recent:
         return
+    
+    print(f"[HISTORY] Rendering {len(recent)} entries from session state for {current_doc}", file=sys.stderr)
     
     # Chat styling with left/right aligned bubbles and avatars
     st.markdown("""
@@ -472,6 +490,10 @@ if "results" not in st.session_state:
     st.session_state.results = {}
 if "last_question" not in st.session_state:
     st.session_state.last_question = ""
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "loaded_docs" not in st.session_state:
+    st.session_state.loaded_docs = set()
 
 uploaded = st.file_uploader("Upload a PDF, DOCX or TXT file", type=["pdf", "docx", "txt"])
 
@@ -503,6 +525,24 @@ if uploaded is not None:
                     f"✅ Extracted {len(st.session_state.document_text)} chars ({size_mb:.2f} MB) "
                     f"in {st.session_state.extraction_seconds:.2f}s"
                 )
+                
+                # Load existing history for this document into session state (one-time per upload)
+                if history_enabled and st.session_state.history_manager:
+                    try:
+                        doc_name = st.session_state.get("uploaded_name")
+                        if doc_name and doc_name not in st.session_state.loaded_docs:
+                            disk_history = st.session_state.history_manager.get_recent_questions(
+                                document_name=doc_name,
+                                limit=int(os.getenv("HISTORY_LIMIT", "10"))
+                            )
+                            if disk_history:
+                                # Prepend disk history to session state (oldest first)
+                                st.session_state.chat_history = disk_history + st.session_state.chat_history
+                                st.session_state.loaded_docs.add(doc_name)
+                                print(f"[HISTORY] Loaded {len(disk_history)} entries from disk for {doc_name}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[HISTORY] Failed to load disk history: {e}", file=sys.stderr)
+
             except RuntimeError as e:
                 # OCR-related errors
                 st.warning(f"⚠️ **Note on scanned PDFs**: {e}")
