@@ -101,6 +101,11 @@ OPENAI_API_KEY = "sk-proj-..."
 LANGSMITH_API_KEY = "lsv2_pt_..."
 LANGSMITH_TRACING = "true"
 LANGSMITH_PROJECT = "ai-docusearch"
+
+# Optional: Question history tracking (Step 6)
+HISTORY_ENABLED = "true"
+HISTORY_RETENTION_DAYS = "30"
+HISTORY_LIMIT = "10"
 ```
 
 ### 3.3: Save & Rerun
