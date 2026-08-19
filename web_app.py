@@ -547,9 +547,6 @@ if st.session_state.document_text:
     
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Show aggregate metrics below chat box
-    render_aggregate_metrics()
-    
     if question:
         # Disable RAG/Hybrid on mobile
         if is_mobile and mode in ["RAG", "Hybrid"]:
