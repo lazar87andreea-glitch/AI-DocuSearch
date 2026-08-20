@@ -111,6 +111,7 @@ def generate_answer_with_meta(
                     if len(parts) > 1:
                         question_text = prompt.split(parts[0] + "question")[-1].strip()[:200]
                 
+                print(f"[LANGSMITH] About to call create_run...", file=sys.stderr)
                 run = _ls_client.create_run(
                     name="generate_answer",
                     run_type="llm",
@@ -120,9 +121,16 @@ def generate_answer_with_meta(
                         "model": resolved_model,
                     },
                 )
-                print(f"[LANGSMITH] Run created with ID: {run.id if hasattr(run, 'id') else run}", file=sys.stderr)
+                print(f"[LANGSMITH] create_run returned: {run} (type: {type(run)})", file=sys.stderr)
+                if run is None:
+                    print(f"[LANGSMITH] WARNING: create_run returned None! Tracing may be disabled.", file=sys.stderr)
+                    print(f"[LANGSMITH] Check LANGSMITH_TRACING and LANGSMITH_API_KEY", file=sys.stderr)
+                else:
+                    print(f"[LANGSMITH] Run created with ID: {run.id if hasattr(run, 'id') else run}", file=sys.stderr)
             except Exception as e:
-                print(f"[LANGSMITH] Failed to create run: {e}", file=sys.stderr)
+                print(f"[LANGSMITH] Failed to create run: {type(e).__name__}: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
                 run = None
         
         # Try to get the answer from the API

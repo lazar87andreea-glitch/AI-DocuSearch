@@ -29,19 +29,49 @@ def _initialize_langsmith():
     
     # Load ALL secrets from Streamlit into os.environ (both LLM and LangSmith)
     try:
-        if hasattr(st, 'secrets'):
-            for key, value in st.secrets.items():
-                converted = _to_env_string(value)
-                os.environ[key] = converted
-                if "LANGSMITH" in key or "LLM" in key:
-                    print(f"[INIT] Set {key} = {converted[:50]}...", file=sys.stderr)
+        if hasattr(st, 'secrets') and st.secrets:
+            print(f"[INIT] st.secrets available, loading...", file=sys.stderr)
+            # Try direct dict iteration first
+            try:
+                for key, value in st.secrets.items():
+                    converted = _to_env_string(value)
+                    os.environ[key] = converted
+                    if "LANGSMITH" in key or "LLM" in key:
+                        print(f"[INIT] Set {key} = {converted[:30]}...", file=sys.stderr)
+            except AttributeError:
+                # Fallback for Streamlit secrets that don't support .items()
+                print(f"[INIT] st.secrets.items() failed, trying direct access", file=sys.stderr)
+                keys_to_check = ["LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT", 
+                                 "LLM_API_KEY", "LLM_API_BASE", "LLM_MODEL"]
+                for key in keys_to_check:
+                    try:
+                        value = st.secrets.get(key)
+                        if value:
+                            converted = _to_env_string(value)
+                            os.environ[key] = converted
+                            print(f"[INIT] Set {key} = {converted[:30]}...", file=sys.stderr)
+                    except Exception:
+                        pass
+        else:
+            print(f"[INIT] st.secrets not available or empty", file=sys.stderr)
     except Exception as e:
         print(f"[INIT] Failed to load secrets: {e}", file=sys.stderr)
     
+    # ENSURE LANGSMITH_TRACING is set to "true" (must be string, not boolean)
+    if not os.getenv("LANGSMITH_TRACING"):
+        print(f"[INIT] WARNING: LANGSMITH_TRACING not set, defaulting to 'true'", file=sys.stderr)
+        os.environ["LANGSMITH_TRACING"] = "true"
+    else:
+        tracing_val = os.getenv("LANGSMITH_TRACING")
+        if isinstance(tracing_val, bool):
+            # Convert bool to string
+            os.environ["LANGSMITH_TRACING"] = "true" if tracing_val else "false"
+            print(f"[INIT] Converted LANGSMITH_TRACING to string: {os.environ['LANGSMITH_TRACING']}", file=sys.stderr)
+    
     # Log LangSmith configuration
     print(f"[INIT] LANGSMITH_API_KEY present: {bool(os.getenv('LANGSMITH_API_KEY'))}", file=sys.stderr)
-    print(f"[INIT] LANGSMITH_TRACING: {os.getenv('LANGSMITH_TRACING')}", file=sys.stderr)
-    print(f"[INIT] LANGSMITH_PROJECT: {os.getenv('LANGSMITH_PROJECT')}", file=sys.stderr)
+    print(f"[INIT] LANGSMITH_TRACING: '{os.getenv('LANGSMITH_TRACING')}'", file=sys.stderr)
+    print(f"[INIT] LANGSMITH_PROJECT: '{os.getenv('LANGSMITH_PROJECT')}'", file=sys.stderr)
     
     # Now import langsmith with environment properly configured
     try:
@@ -73,7 +103,11 @@ from src.prompt_loader import load_prompt_with_temperature
 try:
     from langsmith import Client
     _langsmith_client = Client()
-except Exception:
+    print(f"[INIT] LangSmith Client created: {_langsmith_client}", file=sys.stderr)
+except Exception as e:
+    print(f"[INIT] Failed to create LangSmith Client: {type(e).__name__}: {e}", file=sys.stderr)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
     _langsmith_client = None
 
 # Mobile detection helper
