@@ -79,13 +79,24 @@ def generate_answer_with_meta(
     run_ended = False  # Track if we've already ended the run
     
     if api_key and base_url and resolved_model:
+        # Debug: Log LangSmith environment BEFORE creating client
+        langsmith_key = os.getenv("LANGSMITH_API_KEY")
+        langsmith_tracing = os.getenv("LANGSMITH_TRACING")
+        langsmith_project = os.getenv("LANGSMITH_PROJECT")
+        print(f"[LANGSMITH_ENV] API_KEY present: {bool(langsmith_key)}", file=sys.stderr)
+        print(f"[LANGSMITH_ENV] TRACING: '{langsmith_tracing}'", file=sys.stderr)
+        print(f"[LANGSMITH_ENV] PROJECT: '{langsmith_project}'", file=sys.stderr)
+        
         # Initialize LangSmith client once
         try:
             from langsmith import Client
+            print(f"[LANGSMITH] Attempting to create Client...", file=sys.stderr)
             _ls_client = Client()
-            print(f"[LANGSMITH] Client initialized", file=sys.stderr)
+            print(f"[LANGSMITH] Client initialized successfully", file=sys.stderr)
         except Exception as e:
-            print(f"[LANGSMITH] Failed to initialize client: {e}", file=sys.stderr)
+            print(f"[LANGSMITH] Failed to initialize client: {type(e).__name__}: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
         
         # Create run with question extraction
         if _ls_client:
@@ -179,6 +190,7 @@ def generate_answer_with_meta(
             try:
                 run_id = run.id if hasattr(run, 'id') else run
                 print(f"[LANGSMITH] Ending run with ID: {run_id}", file=sys.stderr)
+                print(f"[LANGSMITH] run object type: {type(run)}, run_id type: {type(run_id)}", file=sys.stderr)
                 
                 if success:
                     # API call succeeded - end run with outputs
@@ -188,14 +200,17 @@ def generate_answer_with_meta(
                         "completion_tokens": int(completion_tokens),
                         "total_tokens": int(total_tokens),
                     }
-                    print(f"[LANGSMITH] Ending run with outputs: {outputs}", file=sys.stderr)
+                    print(f"[LANGSMITH] Outputs dict: {outputs}", file=sys.stderr)
+                    print(f"[LANGSMITH] Output types: answer={type(outputs['answer'])}, tokens={type(outputs['prompt_tokens'])}", file=sys.stderr)
+                    print(f"[LANGSMITH] Calling end_run with outputs...", file=sys.stderr)
                     _ls_client.end_run(run_id, outputs=outputs)
+                    print(f"[LANGSMITH] end_run(outputs=...) completed without exception", file=sys.stderr)
                 else:
                     # API call failed - end run with error
-                    print(f"[LANGSMITH] Ending run with error: {api_error}", file=sys.stderr)
+                    print(f"[LANGSMITH] Calling end_run with error: {api_error}", file=sys.stderr)
                     _ls_client.end_run(run_id, error=api_error)
+                    print(f"[LANGSMITH] end_run(error=...) completed without exception", file=sys.stderr)
                 
-                print(f"[LANGSMITH] Run ended successfully", file=sys.stderr)
                 run_ended = True
                     
             except Exception as ls_error:
