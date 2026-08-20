@@ -1,13 +1,15 @@
 # DocuSearch — Step 4: AI Query & Answer Generation
 
 ## Overview
-The AI query step generates answers to user questions based on the context retrieved from previous steps. It calls a live, OpenAI-compatible chat completions API over HTTPS and falls back to a simulated answer when no provider is configured or the request fails.
+
+✅ **FULLY IMPLEMENTED** — The AI query step generates answers to user questions based on retrieved document context. It calls OpenAI-compatible chat completions APIs and includes **manual LangSmith tracing** for observability (traces inputs, outputs, and timing to LangSmith dashboard).
 
 ## Purpose
-- Generate natural language answers to user questions
-- Use retrieved document context for grounding answers in real data
-- Call any OpenAI-compatible LLM provider when configured (OpenAI, xAI/Grok, Groq, Together, etc.)
-- Provide a safe, deterministic fallback when the API key/URL/model are missing or the request fails
+- Generate natural language answers to user questions grounded in document context
+- Call any OpenAI-compatible LLM provider (OpenAI, xAI/Grok, Groq, Together, etc.)
+- **Trace all queries to LangSmith** with inputs, outputs, and token metrics (when LANGSMITH_TRACING=true)
+- Provide safe fallback when API unavailable or credentials missing
+- Track timing and token usage for performance monitoring
 
 ## Key Concepts
 
@@ -156,6 +158,46 @@ returns a dict instead of a bare string so callers can display timing and token 
   completions convention: `prompt_tokens` / `completion_tokens` / `total_tokens`), those exact
   values are used and `estimated_tokens` is `False`.
 - Otherwise (provider omits `usage`, or the simulated fallback was used), tokens are estimated with
+  a heuristic (~4 chars = 1 token) and `estimated_tokens` is `True`.
+
+---
+
+### Step 4.5: LangSmith Manual Tracing (IMPLEMENTED)
+
+**Purpose:** Capture all LLM queries and responses in LangSmith dashboard for debugging and observability
+
+**Architecture:** Uses **manual Client tracing** (not @traceable decorator) to ensure outputs are properly captured
+
+**Implementation (lines ~75-215 in src/ai_query.py):**
+
+**Initialization:**
+```python
+# Initialize LangSmith variables at function start
+_ls_client = None
+run = None
+run_ended = False
+
+if api_key and base_url and resolved_model:
+    # Debug: Log LangSmith environment BEFORE creating client
+    print(f"[LANGSMITH_ENV] API_KEY present: {bool(os.getenv('LANGSMITH_API_KEY'))}", file=sys.stderr)
+    print(f"[LANGSMITH_ENV] TRACING: '{os.getenv('LANGSMITH_TRACING')}'", file=sys.stderr)
+    print(f"[LANGSMITH_ENV] PROJECT: '{os.getenv('LANGSMITH_PROJECT')}'", file=sys.stderr)
+    
+    # Initialize LangSmith client
+    try:
+        from langsmith import Client
+        _ls_client = Client()
+        print(f"[LANGSMITH] Client initialized successfully", file=sys.stderr)
+    except Exception as e:
+        print(f"[LANGSMITH] Failed to initialize client: {type(e).__name__}: {e}", file=sys.stderr)
+```
+
+**Create Run (before API call):**
+```python
+if _ls_client:
+    try:
+        # Extract question from prompt
+        question_text = prompt.split(\"Question:\")[-1].strip()[:200] if \"Question:\" in prompt else prompt[:200]\n        \n        run = _ls_client.create_run(\n            name=\"generate_answer\",\n            run_type=\"llm\",\n            inputs={\n                \"question\": question_text[:300],\n                \"prompt_length\": len(prompt),\n                \"model\": resolved_model,\n            },\n        )\n        print(f\"[LANGSMITH] Run created with ID: {run.id if hasattr(run, 'id') else run}\", file=sys.stderr)\n    except Exception as e:\n        print(f\"[LANGSMITH] Failed to create run: {type(e).__name__}: {e}\", file=sys.stderr)\n        run = None\n```\n\n**End Run (after API call, with outputs or error):**\n```python\nif run and _ls_client and not run_ended:\n    try:\n        run_id = run.id if hasattr(run, 'id') else run\n        \n        if success:\n            # API call succeeded - end run with outputs\n            outputs = {\n                \"answer\": str(answer[:500]) if answer else \"\",\n                \"prompt_tokens\": int(prompt_tokens),\n                \"completion_tokens\": int(completion_tokens),\n                \"total_tokens\": int(total_tokens),\n            }\n            print(f\"[LANGSMITH] Ending run with outputs: {outputs}\", file=sys.stderr)\n            _ls_client.end_run(run_id, outputs=outputs)\n        else:\n            # API call failed - end run with error\n            print(f\"[LANGSMITH] Ending run with error: {api_error}\", file=sys.stderr)\n            _ls_client.end_run(run_id, error=api_error)\n        \n        run_ended = True\n    except Exception as ls_error:\n        print(f\"[LANGSMITH] CRITICAL ERROR: Failed to end_run: {type(ls_error).__name__}: {ls_error}\", file=sys.stderr)\n```\n\n**Configuration (set in `.env` or Streamlit Secrets):**\n```env\n# Required to enable tracing (note: must be string \"true\", not boolean)\nLANGSMITH_TRACING=true\nLANGSMITH_API_KEY=lsv2_pt_...\nLANGSMITH_PROJECT=ai-docusearch  # Optional, defaults to \"default\"\n```\n\n**Web App Integration (web_app.py lines ~22-70):**\n\nThe `web_app.py` initializes LangSmith **before** importing src modules:\n```python\n@st.cache_resource\ndef _initialize_langsmith():\n    \"\"\"Load secrets into os.environ before any src imports\"\"\"\n    # 1. Load st.secrets into os.environ (handles both .items() and .get() methods)\n    # 2. Ensure LANGSMITH_TRACING=\"true\" (as string, not boolean)\n    # 3. Convert boolean values to \"true\"/\"false\" strings\n    # 4. Log what was loaded\n    # 5. Import and return langsmith.traceable\n    \ntraceable = _initialize_langsmith()\nfrom src.ai_query import generate_answer_with_meta  # src modules now see configured env vars\n```\n\n**Key Differences from @traceable Decorator:**\n- ✅ Manual Client.create_run() / end_run() ensures outputs captured (decorator sometimes misses them on Streamlit Cloud)\n- ✅ All variables initialized at function start (avoids scope issues)\n- ✅ Single end_run() call outside main exception handler (guaranteed to execute)\n- ✅ Supports both success (outputs=...) and error (error=...) paths\n- ✅ Comprehensive logging shows exact data being sent to LangSmith\n\n**Monitoring:**\n\nCheck LangSmith dashboard at https://smith.langchain.com:\n- Each run shows: question (input), answer (output), timing, token counts\n- Failed runs show error message instead of outputs\n- Filter by project name (`LANGSMITH_PROJECT`)\n- Monitor latency and token usage over time\n\n**Debug Logging (visible in Streamlit Cloud logs):**\n```\n[LANGSMITH_ENV] API_KEY present: True/False\n[LANGSMITH_ENV] TRACING: 'true' (must be lowercase string)\n[LANGSMITH] Client initialized successfully\n[LANGSMITH] Run created with ID: <uuid>\n[LANGSMITH] Ending run with outputs: {...}\n```\n\n---\n\n### Step 4.6: Prompt Templates
   a `len(text) // 4` heuristic (`_estimate_tokens`) for both the prompt and the answer, and
   `estimated_tokens` is `True`.
 

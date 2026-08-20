@@ -23,29 +23,48 @@ The LLM is used to synthesize a response from the retrieved content. It should n
 ### 3. Stability over complexity
 For low-memory or low-resource environments, the system includes a lightweight fallback mode so the app remains usable without crashing or downloading heavy models.
 
-## Current architecture
+## Current Status & Feature Completion
 
-```text
-Upload document
-     |
-     v
-Extract text
-     |
-     v
-Clean + chunk text
-     |
-     v
-Build or skip embedding index
-     |
-     v
-Retrieve relevant chunks
-     |
-     v
-LLM uses document context to answer
-     |
-     v
-Return answer + source references
-```
+**Overall:** ✅ ~85% Complete — Core RAG pipeline production-ready; observability and UI polish ongoing
+
+| Step | Module | Status | Notes |
+|------|--------|--------|-------|
+| **Step 1** | Ingestion | ✅ Complete | PDF, DOCX, TXT + OCR fallback |
+| **Step 2** | Preprocessing | ✅ Complete | Chunking with overlap, cleaning |
+| **Step 3** | Embeddings & Index | ✅ Complete | FAISS + NumPy fallback, memory guards, lazy loading |
+| **Step 4** | AI Query + LangSmith | ⚠️ 90% | Manual Client tracing implemented; outputs not capturing on Cloud yet |
+| **Step 5** | Pipeline | ✅ Complete | End-to-end orchestration, lite mode fallback |
+| **Step 6** | History Tracking | ✅ 95% | Hybrid storage (in-memory + disk) working; sidebar UI deferred |
+| **Step 7** | Cloud Deployment | ⚠️ 80% | Deploys; secrets loading partially hardened; needs testing |
+| **UI Chat** | Streamlit App | ✅ Complete | Chat bubbles, mode selector, responsive mobile |
+| **UI Metrics** | Display | ⚠️ Removed | User preference; metrics no longer shown in default view |
+
+---
+
+## Key Accomplishments
+
+- 📄 **Multi-format ingestion:** PDF (with OCR), DOCX (with tables), TXT
+- 🔍 **Semantic search:** FAISS indexing with fallbacks (NumPy, keyword overlap)
+- 💬 **Conversational UI:** Chat interface with left/right bubbles, timestamps, mode badges
+- 💾 **Persistent history:** Dual-layer storage (session cache + disk JSON per user)
+- 📊 **LangSmith tracing:** Manual Client-based tracing for debugging
+- 🌍 **Responsive design:** Desktop + mobile optimized
+- 🛡️ **Stability:** Graceful fallbacks for memory/model/API failures
+
+---
+
+## Known Issues & Roadmap
+
+**Blocking (Sprint 1):**
+- 🔴 LangSmith outputs not appearing in dashboard (diagnostics deployed; debugging in progress)
+
+**Backlog (Sprint 2-4):**
+- 🟡 History sidebar UI (clickable re-run) — deferred to Sprint 2
+- 🟡 CLI history tool — needs testing
+- 🟡 Multi-document search — enhancement
+- 🟡 Analytics dashboard — enhancement
+
+See `IMPLEMENTATION_IMPROVEMENTS.md` for full roadmap.
 
 ## File structure
 
