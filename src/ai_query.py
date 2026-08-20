@@ -115,11 +115,12 @@ def generate_answer_with_meta(
                 run = None
         
         # Try to get the answer from the API
-        answer = None
-        api_error = None
-        prompt_tokens = None
-        completion_tokens = None
-        total_tokens = None
+        answer = ""
+        api_error = ""
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+        success = False
         
         try:
             import requests
@@ -145,18 +146,19 @@ def generate_answer_with_meta(
             resp.raise_for_status()
             data = resp.json()
             answer = data["choices"][0]["message"]["content"]
+            success = True
             print(f"[AI_QUERY] SUCCESS: Got answer from LLM API (length={len(answer)})", file=sys.stderr)
             
             # Extract token usage from response
             usage = data.get("usage") or {}
-            prompt_tokens = usage.get("prompt_tokens")
-            completion_tokens = usage.get("completion_tokens")
-            total_tokens = usage.get("total_tokens")
-            if prompt_tokens is None:
+            prompt_tokens = int(usage.get("prompt_tokens") or 0)
+            completion_tokens = int(usage.get("completion_tokens") or 0)
+            total_tokens = int(usage.get("total_tokens") or 0)
+            if prompt_tokens == 0:
                 prompt_tokens = _estimate_tokens(prompt)
-            if completion_tokens is None:
+            if completion_tokens == 0:
                 completion_tokens = _estimate_tokens(answer)
-            if total_tokens is None:
+            if total_tokens == 0:
                 total_tokens = prompt_tokens + completion_tokens
                 
         except Exception as e:
@@ -168,29 +170,30 @@ def generate_answer_with_meta(
             prompt_tokens = _estimate_tokens(prompt)
             completion_tokens = _estimate_tokens(answer)
             total_tokens = prompt_tokens + completion_tokens
+            success = False
         
-        # NOW end the run (only once, AFTER we have all data)
-        print(f"[LANGSMITH] About to end run: run={run is not None}, _ls_client={_ls_client is not None}, api_error={api_error is not None}", file=sys.stderr)
+        # ALWAYS end the run (only once, AFTER we have all data)
+        print(f"[LANGSMITH] About to end run: run={run is not None}, _ls_client={_ls_client is not None}, run_ended={run_ended}, success={success}", file=sys.stderr)
         
         if run and _ls_client and not run_ended:
             try:
                 run_id = run.id if hasattr(run, 'id') else run
                 print(f"[LANGSMITH] Ending run with ID: {run_id}", file=sys.stderr)
                 
-                if api_error:
-                    # API call failed - end run with error
-                    print(f"[LANGSMITH] Ending run with error: {api_error}", file=sys.stderr)
-                    _ls_client.end_run(run_id, error=api_error)
-                else:
+                if success:
                     # API call succeeded - end run with outputs
                     outputs = {
-                        "answer": answer[:500] if answer else "",
-                        "prompt_tokens": int(prompt_tokens) if prompt_tokens else 0,
-                        "completion_tokens": int(completion_tokens) if completion_tokens else 0,
-                        "total_tokens": int(total_tokens) if total_tokens else 0,
+                        "answer": str(answer[:500]) if answer else "",
+                        "prompt_tokens": int(prompt_tokens),
+                        "completion_tokens": int(completion_tokens),
+                        "total_tokens": int(total_tokens),
                     }
                     print(f"[LANGSMITH] Ending run with outputs: {outputs}", file=sys.stderr)
                     _ls_client.end_run(run_id, outputs=outputs)
+                else:
+                    # API call failed - end run with error
+                    print(f"[LANGSMITH] Ending run with error: {api_error}", file=sys.stderr)
+                    _ls_client.end_run(run_id, error=api_error)
                 
                 print(f"[LANGSMITH] Run ended successfully", file=sys.stderr)
                 run_ended = True
