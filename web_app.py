@@ -169,7 +169,7 @@ if is_mobile:
         "It will use fast, efficient processing optimized for mobile."
     )
 
-st.title("DocuSearch")
+st.title(translate("title"))
 st.markdown(translate("description"))
 
 
