@@ -140,35 +140,78 @@ TRANSLATIONS = {
 
 
 def detect_language_from_header() -> Optional[str]:
-    """Detect language from browser Accept-Language header."""
+    """Detect language from browser Accept-Language header.
+    
+    On Streamlit Cloud, this is the only reliable way to detect user language
+    since IP geolocation sees Streamlit's server IP, not the user's actual location.
+    """
     try:
-        # Try to get Accept-Language header from Streamlit context
-        from streamlit.server.server import Server
-        server = Server.get_current()
-        if server and hasattr(server, '_session_state'):
-            headers = getattr(server, 'headers', {})
-            if isinstance(headers, dict):
-                accept_lang = headers.get('Accept-Language', '')
-                if accept_lang:
-                    # Parse Accept-Language: en-US,en;q=0.9,fr;q=0.8
-                    langs = [lang.split('-')[0].lower() for lang in accept_lang.split(',')]
-                    for lang in langs:
-                        if lang.strip() in TRANSLATIONS:
-                            return lang.strip()
-    except Exception:
-        pass
+        # Method 1: Try to get from Streamlit Server context
+        try:
+            from streamlit.server.server import Server
+            server = Server.get_current()
+            if server:
+                # Try multiple attribute paths
+                headers = None
+                if hasattr(server, 'headers'):
+                    headers = server.headers
+                elif hasattr(server, '_request') and hasattr(server._request, 'headers'):
+                    headers = server._request.headers
+                
+                if headers and isinstance(headers, dict):
+                    accept_lang = headers.get('Accept-Language', '')
+                    if accept_lang:
+                        print(f"[i18n] Found Accept-Language header: {accept_lang}", flush=True)
+                        # Parse: en-US,en;q=0.9,fr;q=0.8,de;q=0.7
+                        langs = [lang.split('-')[0].lower().strip() for lang in accept_lang.split(',')]
+                        for lang in langs:
+                            if lang in TRANSLATIONS:
+                                print(f"[i18n] Matched language from header: {lang}", flush=True)
+                                return lang
+        except Exception as e:
+            print(f"[i18n] Header method 1 failed: {type(e).__name__}", flush=True)
+        
+        # Method 2: Try environment variable (set by some cloud providers)
+        import os
+        env_lang = os.getenv("HTTP_ACCEPT_LANGUAGE", "")
+        if env_lang:
+            print(f"[i18n] Found HTTP_ACCEPT_LANGUAGE env: {env_lang}", flush=True)
+            langs = [lang.split('-')[0].lower().strip() for lang in env_lang.split(',')]
+            for lang in langs:
+                if lang in TRANSLATIONS:
+                    print(f"[i18n] Matched language from env: {lang}", flush=True)
+                    return lang
+    
+    except Exception as e:
+        print(f"[i18n] Accept-Language detection error: {type(e).__name__}: {e}", flush=True)
+    
+    print("[i18n] No Accept-Language header found", flush=True)
     return None
 
 
 def detect_language_from_ip() -> Optional[str]:
-    """Detect language from user IP using free API (fallback)."""
+    """
+    Detect language from user IP using geolocation API (fallback).
+    
+    NOTE: On Streamlit Cloud, this will NOT work because the app sees
+    Streamlit's server IP, not the user's actual IP. This is only useful
+    for local deployments or platforms that forward X-Forwarded-For headers.
+    """
     try:
+        import os
         import requests
-        # Use free IP geolocation API - try HTTPS first, then HTTP
+        
+        # Check if we're on Streamlit Cloud (unlikely to get user IP)
+        is_streamlit_cloud = os.getenv("STREAMLIT_SERVER_HEADLESS") == "true"
+        
+        if is_streamlit_cloud:
+            print("[i18n] On Streamlit Cloud - skipping IP geolocation (unreliable)", flush=True)
+            return None
+        
+        # Try HTTPS first, then HTTP
         try:
             response = requests.get('https://ip-api.com/json/?fields=countryCode', timeout=3)
         except:
-            # Fallback to HTTP if HTTPS fails
             response = requests.get('http://ip-api.com/json/?fields=countryCode', timeout=3)
         
         if response.status_code == 200:
@@ -194,7 +237,17 @@ def detect_language_from_ip() -> Optional[str]:
                 print(f"[i18n] IP detection mapped {country_code} to language: {lang}", flush=True)
                 return lang
     except Exception as e:
-        print(f"[i18n] IP detection failed: {type(e).__name__}: {e}", flush=True)
+        print(f"[i18n] IP detection failed: {type(e).__name__}", flush=True)
+    return None
+
+
+def detect_language_from_browser() -> Optional[str]:
+    """
+    Attempt to detect browser language via Streamlit mechanisms.
+    On Streamlit Cloud, this is limited, so the Accept-Language header method is preferred.
+    """
+    # This function is kept for future use, but currently returns None
+    # as there's no reliable way to get browser language on Streamlit Cloud without sidebars
     return None
 
 
@@ -203,18 +256,25 @@ def get_user_language() -> str:
     Detect user language with fallback chain:
     1. Cached in session state
     2. Browser Accept-Language header
-    3. IP geolocation
-    4. Default to English
+    3. Browser navigator.language (via JavaScript)
+    4. IP geolocation (local deployments only)
+    5. Default to English
     """
     if "user_language" not in st.session_state:
         lang = None
         
-        # Try Accept-Language header first (most accurate)
+        # Try Accept-Language header first (most accurate on non-Streamlit platforms)
         lang = detect_language_from_header()
         if lang:
             print(f"[i18n] Detected language from Accept-Language header: {lang}", flush=True)
         
-        # Fall back to IP geolocation
+        # Try browser detection (Streamlit Cloud compatible)
+        if not lang:
+            lang = detect_language_from_browser()
+            if lang:
+                print(f"[i18n] Detected language from browser: {lang}", flush=True)
+        
+        # Fall back to IP geolocation (local deployments only, skipped on Streamlit Cloud)
         if not lang:
             lang = detect_language_from_ip()
             if lang:
