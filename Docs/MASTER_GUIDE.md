@@ -41,7 +41,7 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 
 ## Current Status & Feature Completion
 
-**Overall:** ✅ ~95% Complete — Core RAG pipeline production-ready; multilingual support, feedback collection, and UI polish complete
+**Overall:** ✅ ~95% Complete — Core RAG pipeline production-ready; multilingual support, budget tracking, GDPR compliance, and UI polish complete
 
 | Step | Module | Status | Notes |
 |------|--------|--------|-------|
@@ -54,6 +54,8 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 | **Step 7** | Cloud Deployment | ⚠️ 80% | Deploys; secrets loading partially hardened; needs testing |
 | **Step 8** | Feedback Collection | ✅ Complete | Thumbs up/down ratings, detailed feedback, per-session isolation |
 | **Step 9** | Internationalization | ✅ Complete | Multilingual UI, auto language detection, document metadata |
+| **Cost Tracking** | Budget Management | ✅ Complete | Grok pricing ($0.03/1K in, $0.10/1K out), real-time badge, warnings, blocking |
+| **GDPR Compliance** | Privacy & Legal | ✅ Complete | Consent banner, data export/deletion, footer links, legal docs |
 | **UI Chat** | Streamlit App | ✅ Complete | Hybrid mode only, chat bubbles, responsive mobile, page count |
 | **UI Metrics** | Display | ⚠️ Removed | User preference; metrics no longer shown in default view |
 
@@ -70,6 +72,8 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 - 🌍 **Multilingual support:** Auto-detected language, translated UI (English, Romanian, French, Spanish, German)
 - 📄 **Document metadata:** Automatic page count detection for PDFs, metadata accessible to LLM
 - 🗣️ **Language-aware responses:** LLM responds in the user's question language
+- 💰 **Cost tracking & budgeting:** Real-time LLM usage monitoring with Grok pricing, visual badge, budget warnings and blocking
+- 🔐 **GDPR compliance:** Consent banner, user data export/deletion, privacy policy, terms of service, footer links
 - 🌐 **Responsive design:** Desktop + mobile optimized
 - 🛡️ **Stability:** Graceful fallbacks for memory/model/API failures
 
@@ -105,8 +109,10 @@ AI DocuSearch/
 ├── export_feedback.py                 # Feedback analytics & export tool
 ├── src/
 │   ├── ai_query.py
+│   ├── cost_tracker.py                 # Cost tracking & budget management (NEW)
 │   ├── embed_index.py
 │   ├── feedback_manager.py            # User feedback collection (NEW)
+│   ├── gdpr_compliance.py             # GDPR features: consent, data export/deletion (NEW)
 │   ├── history_manager.py
 │   ├── i18n.py                        # Internationalization & multilingual support (NEW)
 │   ├── ingest.py
@@ -125,9 +131,14 @@ AI DocuSearch/
 │   ├── STEP_5_PIPELINE.md
 │   ├── STEP_6_HISTORY_TRACKING.md
 │   ├── STEP_7_STREAMLIT_CLOUD_DEPLOYMENT.md
-│   └── STEP_8_FEEDBACK_COLLECTION.md  # User feedback system (NEW)
+│   ├── STEP_8_FEEDBACK_COLLECTION.md
+│   ├── STEP_9_INTERNATIONALIZATION.md
+│   ├── STEP_10_COST_TRACKING.md              # LLM budget management (NEW)
+│   └── STEP_11_GDPR_COMPLIANCE.md            # Privacy & legal framework (NEW)
 ├── examples/
 │   └── sample.txt
+├── PRIVACY_POLICY.md                   # GDPR/CCPA compliance documentation (NEW)
+├── TERMS_OF_SERVICE.md                 # User agreement & AI disclaimers (NEW)
 └── ...
 ```
 

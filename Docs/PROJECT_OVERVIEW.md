@@ -109,37 +109,52 @@ AI DocuSearch includes a **simple usage model** designed for experimentation whi
 
 | Tier | Price | What You Get | Limits |
 |------|-------|-------------|--------|
-| **Free** | $0 | Upload & ask questions | • $0.50 Grok usage/session<br>• ~10–15 questions<br>• ~10–15 pages<br>• ~10k–15k tokens |
+| **Free** | $0 | Upload & ask questions | • $0.50 Grok usage/session<br>• ~25 questions (on 100-page doc)<br>• ~20-30 pages<br>• ~20k–30k tokens |
 | **Developer** | $5/month | Personal projects & testing | • 150 questions/month<br>• 50-page docs<br>• Faster embeddings<br>• Priority API access |
 | **Pro** | $15/month | Heavy users & researchers | • 500 questions/month<br>• 150-page docs<br>• Multi-doc search<br>• Agent-mode analysis |
 | **Team/Business** | Custom | Teams & enterprises | • Unlimited questions<br>• 200+ page docs<br>• Shared workspace<br>• Audit logs<br>• API access |
 
 ### How the Free Tier Works
 
-The free tier is limited to **$0.50 USD** of LLM (Grok) usage per session.
+The free tier is limited to **$0.50 USD** of LLM (Grok) usage per session with automatic tracking and budget enforcement.
 
-**Token Breakdown:**
-- Average cost per question: $0.03–$0.05
-- Free tier allows: ~10–15 questions
+**Grok LLM Pricing:**
+- Input tokens: $0.03 per 1,000 tokens
+- Output tokens: $0.10 per 1,000 tokens
+- Average cost per question: $0.020–$0.025
+- Free tier allows: **~25 questions on a ~100-page document**
+- Larger documents support fewer questions (inversely proportional)
+
+**Token Breakdown (100-page doc):**
 - 1 page ≈ 300–500 tokens
-- 10 pages ≈ 3,000–5,000 tokens
-- Embedding cost: ~$0.02–$0.05
-- Free tier supports: ~10–15 pages total
+- 100 pages ≈ 30,000–50,000 tokens
+- Average question processing: 800–1,200 tokens (input + output)
+- Total budget: ~20,000–30,000 tokens
 
-**Total Token Budget:** ~10,000–15,000 tokens (extraction + chunking + embedding + retrieval + generation)
+**Budget Enforcement:**
+- Real-time cost tracking with visual badge
+- ⚠️ Warning displayed at 80% of budget
+- 🛑 Blocking at 100% (user must restart session to continue)
 
-### When the Limit Is Reached
+### Budget Management Features
 
-1. App stops answering questions
-2. "Usage limit reached" message appears
-3. User can restart session or upgrade
+**Automatic Tracking:**
+- Cost badge displays in real-time: **💚 Cost: 24%**
+- Tracks actual Grok API usage from token counts
+- Updates after each question processed
 
-### Why These Limits Exist
+**User Controls:**
+- ⚠️ **80% Warning** — Alerts user budget is nearly exhausted
+- 🛑 **100% Blocking** — Prevents new questions when limit reached
+- Session restart clears budget and allows new $0.50 allocation
 
-✅ Predictable costs  
-✅ Fair usage policy  
-✅ Safe experimentation  
+**Why These Limits Exist:**
+
+✅ Predictable costs (no surprise charges)  
+✅ Fair usage policy (shared resources)  
+✅ Safe experimentation (ideal for testing & demos)  
 ✅ No accidental credit drain  
+✅ Encourages efficient document summarization  
 
 ---
 

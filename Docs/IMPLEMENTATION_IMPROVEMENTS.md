@@ -11,6 +11,29 @@ The current implementation has completed **~85%** of the planned features (↑ f
 
 ---
 
+## Recent Updates (2026-08-25)
+
+✅ **Cost Tracking System Implemented** — Automatic LLM usage monitoring:
+- `src/cost_tracker.py`: Grok pricing engine ($0.03/1K input + $0.10/1K output)
+- Real-time budget tracking with visual badge showing percentage usage
+- ⚠️ Warning at 80% budget ($0.40 of $0.50)
+- 🛑 Hard block at 100% budget ($0.50) — user must restart session
+- Multilingual budget info displayed in app description (5 languages)
+- Cost data integrated into GDPR data export (right to portability)
+- Updated pricing table: Free tier now supports ~25 questions on 100-page docs
+
+✅ **UI/UX Improvements** — No more sidebar panels:
+- Removed sidebar-based GDPR data management (show_gdpr_sidebar deprecated)
+- Added footer-based links for Privacy Policy and Terms of Service
+- Links open in new browser windows
+- Consent banner remains at top, now with multilingual support
+- Cleaner, distraction-free interface
+
+📈 **Updated Status:**
+- Overall: 85% → 90% (cost tracking feature complete, UI redesigned)
+
+---
+
 ## Recent Updates (2026-08-20)
 
 ✅ **Documentation Sync Complete** — All MD files updated to reflect actual implementation:
@@ -41,6 +64,9 @@ The current implementation has completed **~85%** of the planned features (↑ f
 | **Streamlit UI — Metrics Display** | ✅ Removed | User preference; metrics hidden from default view |
 | **Step 6: History Tracking** | ✅ 95% | Hybrid storage (in-memory + disk) fully working; sidebar UI **not implemented** (deferred) |
 | **Step 7: Cloud Deployment** | ⚠️ 80% | App deploys; secrets loading partially hardened; full testing pending |
+| **Cost Tracking & Budget Management** | ✅ Complete | Grok pricing engine, real-time tracking, warnings, blocking, GDPR integration |
+| **GDPR Compliance Suite** | ✅ Complete | Consent banner, data export, deletion, legal docs, footer links |
+| **Internationalization (i18n)** | ✅ Complete | Auto-detection (header + IP geolocation), 5-language support, budget info translations |
 
 ### 🔴 Known Issues
 
