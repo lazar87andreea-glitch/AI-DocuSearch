@@ -137,7 +137,13 @@ def answer_question(
 
 **Process:**
 
-1. **Branch on lite mode (timed)**
+1. **Check answer quality (NEW: Semantic Fallback)**
+   - After RAG returns an answer, hybrid mode checks if it's inconclusive
+   - Inconclusive patterns detected: "does not provide", "does not contain", "not found in", "cannot find", "i don't know", "unclear", "not specified", "not mentioned"
+   - If inconclusive, automatically invokes Direct LLM mode for a better answer using general knowledge
+   - Fallback reason is tracked in result for metrics transparency
+
+2. **Branch on lite mode (timed)**
    - If `pipeline["index"] is None` (lite mode), retrieval uses `_lightweight_indices` (keyword
      overlap) instead of semantic search — see Step 5.2b.
    - Otherwise, calls `pipeline["index"].search(question, k=top_k)` for semantic retrieval.

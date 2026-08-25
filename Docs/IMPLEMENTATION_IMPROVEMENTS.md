@@ -1,14 +1,15 @@
 # AI DocuSearch — Implementation Improvements & Gap Analysis
 
-**Last Updated:** 2026-08-25 (Final implementation phase complete)  
-**Status:** ~95% Complete - All core and compliance features implemented and tested
+**Last Updated:** 2026-08-25 (Semantic fallback enhancement complete)  
+**Status:** 96%+ Complete - All core and compliance features implemented and tested
 
 ---
 
 ## Executive Summary
 
-The implementation is **95%+ complete**. All core features are production-ready:
+The implementation is **96%+ complete**. All core features are production-ready:
 - ✅ RAG pipeline with document ingestion and AI query
+- ✅ Semantic fallback for inconclusive RAG answers → Direct LLM
 - ✅ Persistent history tracking (hybrid storage)
 - ✅ LangSmith manual tracing for observability
 - ✅ Cost tracking & budget management (Grok pricing)
@@ -21,6 +22,14 @@ The only deferred feature is the history sidebar UI (not implemented by design -
 ---
 
 ## Recent Updates (2026-08-25)
+
+✅ **Semantic Fallback for Inconclusive RAG Answers** — Improved Hybrid Mode:
+- When RAG returns an "I don't know" response (e.g., "The document does not provide this information")
+- Automatically fallback to Direct LLM mode for potentially better results
+- Detects 9 inconclusive patterns: "does not provide", "does not contain", "not found in", "cannot find", etc.
+- Maintains `fallback_reason` in result dict for metrics transparency
+- Improves UX for out-of-document questions while staying document-focused when info exists
+- Implementation: `_is_rag_inconclusive()` helper in web_app.py + enhanced run_hybrid() logic
 
 ✅ **Cost Tracking System Implemented** — Automatic LLM usage monitoring:
 - `src/cost_tracker.py`: Grok pricing engine ($0.03/1K input + $0.10/1K output)
@@ -39,7 +48,7 @@ The only deferred feature is the history sidebar UI (not implemented by design -
 - Cleaner, distraction-free interface
 
 📈 **Updated Status:**
-- Overall: 85% → 90% (cost tracking feature complete, UI redesigned)
+- Overall: 95% → 96% (semantic fallback feature complete, hybrid mode enhanced)
 
 ---
 

@@ -73,7 +73,8 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 - 📄 **Document metadata:** Automatic page count detection for PDFs, metadata accessible to LLM
 - 🗣️ **Language-aware responses:** LLM responds in the user's question language
 - 💰 **Cost tracking & budgeting:** Real-time LLM usage monitoring with Grok pricing, visual badge, budget warnings and blocking
-- 🔐 **GDPR compliance:** Consent banner, user data export/deletion, privacy policy, terms of service, footer links
+- � **Semantic fallback:** Automatic Direct LLM invocation when RAG can't answer document-based questions
+- �🔐 **GDPR compliance:** Consent banner, user data export/deletion, privacy policy, terms of service, footer links
 - 🌐 **Responsive design:** Desktop + mobile optimized
 - 🛡️ **Stability:** Graceful fallbacks for memory/model/API failures
 
