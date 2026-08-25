@@ -164,11 +164,18 @@ def detect_language_from_ip() -> Optional[str]:
     """Detect language from user IP using free API (fallback)."""
     try:
         import requests
-        # Use free IP geolocation API
-        response = requests.get('http://ip-api.com/json/?fields=countryCode', timeout=2)
+        # Use free IP geolocation API - try HTTPS first, then HTTP
+        try:
+            response = requests.get('https://ip-api.com/json/?fields=countryCode', timeout=3)
+        except:
+            # Fallback to HTTP if HTTPS fails
+            response = requests.get('http://ip-api.com/json/?fields=countryCode', timeout=3)
+        
         if response.status_code == 200:
             data = response.json()
             country_code = data.get('countryCode', '').lower()
+            
+            print(f"[i18n] IP geolocation detected country: {country_code}", flush=True)
             
             # Map country codes to languages
             country_to_lang = {
@@ -184,9 +191,10 @@ def detect_language_from_ip() -> Optional[str]:
             }
             lang = country_to_lang.get(country_code)
             if lang in TRANSLATIONS:
+                print(f"[i18n] IP detection mapped {country_code} to language: {lang}", flush=True)
                 return lang
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[i18n] IP detection failed: {type(e).__name__}: {e}", flush=True)
     return None
 
 
@@ -199,19 +207,26 @@ def get_user_language() -> str:
     4. Default to English
     """
     if "user_language" not in st.session_state:
+        lang = None
+        
         # Try Accept-Language header first (most accurate)
         lang = detect_language_from_header()
+        if lang:
+            print(f"[i18n] Detected language from Accept-Language header: {lang}", flush=True)
         
         # Fall back to IP geolocation
         if not lang:
             lang = detect_language_from_ip()
+            if lang:
+                print(f"[i18n] Detected language from IP geolocation: {lang}", flush=True)
         
         # Default to English
         if not lang:
             lang = "en"
+            print(f"[i18n] No language detected, defaulting to: {lang}", flush=True)
         
         st.session_state.user_language = lang
-        print(f"[i18n] Detected language: {lang}", flush=True)
+        print(f"[i18n] Final detected language: {lang}", flush=True)
     
     return st.session_state.user_language
 

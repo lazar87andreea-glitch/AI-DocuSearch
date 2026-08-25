@@ -376,25 +376,8 @@ def log_to_history(mode: str, question: str, result: dict, document_name: str) -
 
 
 def render_history_sidebar() -> None:
-    """Sidebar now contains language selector."""
-    from src.i18n import get_user_language, get_supported_languages, set_language
-    
-    with st.sidebar:
-        st.markdown("### 🌍 Language / Limbă / Langue")
-        current_lang = get_user_language()
-        supported = get_supported_languages()
-        
-        selected_lang = st.selectbox(
-            "Select language",
-            options=list(supported.keys()),
-            format_func=lambda x: f"{supported[x]} ({x.upper()})",
-            index=list(supported.keys()).index(current_lang),
-            key="language_selector_sidebar"
-        )
-        
-        if selected_lang != current_lang:
-            set_language(selected_lang)
-            st.rerun()
+    """Sidebar is empty - GDPR features moved to footer, auto language detection handles i18n."""
+    pass
 
 
 def render_chat_history() -> None:
