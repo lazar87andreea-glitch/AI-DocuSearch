@@ -12,6 +12,7 @@ import streamlit as st
 # Translation dictionary - add more languages/translations as needed
 TRANSLATIONS = {
     "en": {
+        "description": "Don't remember what a document is all about? Upload your document, ask a question, and get instant answers using AI.",
         "upload_prompt": "Upload a PDF, DOCX or TXT file",
         "file_saved": "📁 File saved",
         "extracting": "⏳ Extracting text from document...",
@@ -34,6 +35,7 @@ TRANSLATIONS = {
         "ocr_tip": "📌 **Tip**: For best results, use PDFs with selectable text",
     },
     "ro": {
+        "description": "Nu-ți amintești ce conține un document? Încarcă documentul tău, pune o întrebare și obține răspunsuri instantanee folosind IA.",
         "upload_prompt": "Încarcă un fișier PDF, DOCX sau TXT",
         "file_saved": "📁 Fișier salvat",
         "extracting": "⏳ Se extrage textul din document...",
@@ -56,6 +58,7 @@ TRANSLATIONS = {
         "ocr_tip": "📌 **Sfat**: Pentru rezultate optime, folosește PDF-uri cu text selectabil",
     },
     "fr": {
+        "description": "Vous ne vous souvenez pas de quoi parle un document? Téléchargez votre document, posez une question et obtenez des réponses instantanées en utilisant l'IA.",
         "upload_prompt": "Télécharger un fichier PDF, DOCX ou TXT",
         "file_saved": "📁 Fichier enregistré",
         "extracting": "⏳ Extraction du texte du document...",
@@ -78,6 +81,7 @@ TRANSLATIONS = {
         "ocr_tip": "📌 **Conseil**: Pour de meilleurs résultats, utilisez des PDF avec du texte sélectionnable",
     },
     "es": {
+        "description": "¿No recuerdas de qué trata un documento? Carga tu documento, haz una pregunta y obtén respuestas instantáneas usando IA.",
         "upload_prompt": "Carga un archivo PDF, DOCX o TXT",
         "file_saved": "📁 Archivo guardado",
         "extracting": "⏳ Extrayendo texto del documento...",
@@ -100,6 +104,7 @@ TRANSLATIONS = {
         "ocr_tip": "📌 **Consejo**: Para mejores resultados, usa PDF con texto seleccionable",
     },
     "de": {
+        "description": "Erinnerst du dich nicht, worum es in einem Dokument geht? Lade dein Dokument hoch, stelle eine Frage und erhalte sofortige Antworten mit KI.",
         "upload_prompt": "PDF-, DOCX- oder TXT-Datei hochladen",
         "file_saved": "📁 Datei gespeichert",
         "extracting": "⏳ Text aus Dokument wird extrahiert...",

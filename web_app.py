@@ -98,7 +98,7 @@ from src.ingest import extract_text, get_pdf_page_count
 from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
 from src.prompt_loader import load_prompt_with_temperature
-from src.i18n import translate, get_user_language, add_language_selector_sidebar
+from src.i18n import translate, get_user_language
 
 # Initialize LangSmith client for manual tracing
 try:
@@ -170,10 +170,7 @@ if is_mobile:
     )
 
 st.title("DocuSearch")
-st.markdown(
-    "Don't remember what a document is all about? Upload your document, ask a question, "
-    "and get instant answers using AI."
-)
+st.markdown(translate("description"))
 
 
 def save_uploaded(uploaded_file):
@@ -650,9 +647,6 @@ else:
 
 # Render history sidebar
 render_history_sidebar()
-
-# Add language selector to sidebar
-add_language_selector_sidebar()
 
 # Initialize chat history for conversation
 if "chat_messages" not in st.session_state:
