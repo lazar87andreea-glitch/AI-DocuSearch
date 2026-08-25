@@ -1,0 +1,19 @@
+[
+  {
+    "timestamp": "2026-08-25T18:06:55.501154",
+    "question": "care sunt subiectele din acest document ?",
+    "answer": "**Subiectele principale din document:**\n\n- **Veridicitatea istoriei naționale românești**: Discuții despre confirmarea (chiar „off the record”) a unor afirmații istorice de către istorici, geologi și clarvăzători, existența unor artefacte și documente care atestă originea poporului român, și o „înțelegere tacită” din mediile academice de a nu dezvălui anumite aspecte.\n\n- **Orașe subterane și biblioteci ascunse**: Descrierea accesului la biblioteci și orașe subterane prin pante abrupte, cu mențiuni despre un conducător al lucrărilor care ar fi un „suflet vechi” din Atlantida, temându-se că descoperirile ar putea schimba istoria sau distruge țara.\n\n- **Tehnologia cristalelor**: Viziuni despre săli uriașe cu cristale centrale care răspund la întrebări proiectând imagini pe pereți (pereți „ca de sticlă”), cristale mai mici folosite doar pentru memorarea și redarea informațiilor.\n\n- **Arhitectura și forma orașelor antice**: Străzi late din piatră și orașe cu formă specială văzută de sus (din cer).\n\nDocumentul pare a fi un fragment din **Cartea a II-a a seriei „Inuaki – Reptilianul din mine”**, axat pe istorie alternativă, Atlantida, civilizații subterane și tehnologii antice cu cristale.",
+    "mode": "Hybrid",
+    "document_name": "1_INUAKI-Reptilianul-Din-Mine-Cartea-a-II-a.pdf",
+    "metrics": {
+      "total_seconds": 230.39923609999823,
+      "retrieval_seconds": 0.06469669999933103,
+      "generation_seconds": 8.744588599998679,
+      "chunk_count": 3,
+      "prompt_tokens": 825,
+      "completion_tokens": 326,
+      "total_tokens": 1582,
+      "temperature": 0.4
+    }
+  }
+]

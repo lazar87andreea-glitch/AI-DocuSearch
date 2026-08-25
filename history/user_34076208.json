@@ -32,5 +32,39 @@
       "total_tokens": 1781,
       "temperature": 0.4
     }
+  },
+  {
+    "timestamp": "2026-08-25T17:58:07.064873",
+    "question": "vreau mai multe detalii despre Trezirea spirituală și rolul fricii",
+    "answer": "Documentul furnizat nu conține informații directe sau explicite despre „trezirea spirituală” și rolul fricii. \n\nPe baza contextului din dialog (evoluția planetei prin întruparea ființelor evoluate, dezlegarea legăturilor karmice, trăirea în Adevăr și construirea unei societăți bazate pe spiritualitate), se poate infera că procesul de evoluție colectivă implică alinierea la Adevăr și renunțarea la influențe negative precum mândria sau orgoliul, care blochează progresul. Nu se menționează însă frica sau trezirea ca atare.",
+    "mode": "Hybrid",
+    "document_name": "1_INUAKI-Reptilianul-Din-Mine-Cartea-a-II-a.pdf",
+    "metrics": {
+      "total_seconds": 40.92464249999466,
+      "retrieval_seconds": 0.012294899999687914,
+      "generation_seconds": 8.439722600000096,
+      "chunk_count": 3,
+      "prompt_tokens": 848,
+      "completion_tokens": 142,
+      "total_tokens": 1630,
+      "temperature": 0.4
+    }
+  },
+  {
+    "timestamp": "2026-08-25T18:00:05.939293",
+    "question": "poti sa imi dai un fragment din document despre subiectul acesta? primul care mentioneaza",
+    "answer": "Da, iată primul fragment relevant din document (extras din textul furnizat) care menționează subiectul:\n\n„Pe parcursul editării acestei cărţi am discutat cu mai multe persoane, istorici, geologi, clarvăzători, etc, cărora ţin să le mulţumesc pe această cale, care mi-au confirmat, deşi «out of record», veridicitatea unor afirmaţii. De aceea am dedus că la nivel general, chiar în mediile academice, anumite aspecte ale istoriei noastre ca naţie sunt cunoscute, că există artefacte şi documente care atestă cine suntem şi de unde venim, dar că printr-o anumită înţelegere tacită, din m”",
+    "mode": "Hybrid",
+    "document_name": "1_INUAKI-Reptilianul-Din-Mine-Cartea-a-II-a.pdf",
+    "metrics": {
+      "total_seconds": 63.37449680001009,
+      "retrieval_seconds": 0.016068000004452188,
+      "generation_seconds": 7.24641469999915,
+      "chunk_count": 3,
+      "prompt_tokens": 833,
+      "completion_tokens": 155,
+      "total_tokens": 1474,
+      "temperature": 0.4
+    }
   }
 ]

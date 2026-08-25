@@ -627,11 +627,54 @@ def render_chat_history() -> None:
         <div class="chat-message bot">
             <div>
                 <div class="chat-bubble bot">{answer}</div>
-                <div class="chat-info bot">{mode}</div>
             </div>
             <div class="chat-avatar bot">BOT</div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Feedback buttons for this answer
+        col1, col2, col3 = st.columns([1, 1, 3])
+        feedback_manager = st.session_state.get("feedback_manager")
+        document_name = st.session_state.get("uploaded_name", "unknown")
+        answer_id = f"ans_{entry.get('timestamp', '')}"
+        
+        with col1:
+            if st.button("👍 Helpful", key=f"feedback_positive_{answer_id}"):
+                if feedback_manager:
+                    feedback_manager.add_feedback(
+                        answer_id=answer_id,
+                        rating=True,
+                        question=question,
+                        document=document_name,
+                        comment="",
+                        feedback_type="answer_rating",
+                        mode=mode,
+                        context_chars=entry.get("context_chars", 0),
+                        chunk_count=entry.get("chunk_count", 0),
+                        elapsed_seconds=entry.get("elapsed_seconds", 0)
+                    )
+                    st.success("✅ Thanks for the feedback!")
+                    print(f"[FEEDBACK] Positive feedback for {answer_id}", file=sys.stderr)
+        
+        with col2:
+            if st.button("👎 Not helpful", key=f"feedback_negative_{answer_id}"):
+                if feedback_manager:
+                    feedback_manager.add_feedback(
+                        answer_id=answer_id,
+                        rating=False,
+                        question=question,
+                        document=document_name,
+                        comment="",
+                        feedback_type="answer_rating",
+                        mode=mode,
+                        context_chars=entry.get("context_chars", 0),
+                        chunk_count=entry.get("chunk_count", 0),
+                        elapsed_seconds=entry.get("elapsed_seconds", 0)
+                    )
+                    st.warning("📝 We'll use this to improve!")
+                    print(f"[FEEDBACK] Negative feedback for {answer_id}", file=sys.stderr)
+        
+        st.markdown("---")
 
 
 def render_aggregate_metrics() -> None:
@@ -852,11 +895,7 @@ if st.session_state.document_text:
                 log_to_history(mode, question, result, st.session_state.get("uploaded_name", "unknown"))
                 print(f"[CHAT] log_to_history completed", file=sys.stderr)
                 
-                # Display result with feedback buttons
-                print(f"[CHAT] Displaying result with render_result...", file=sys.stderr)
-                render_result("hybrid", result)
-                
-                # Rerun to update chat history display
+                # Rerun to update chat history display with feedback buttons
                 st.rerun()
                 
             except Exception as e:
