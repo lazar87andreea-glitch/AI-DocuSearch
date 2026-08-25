@@ -99,7 +99,8 @@ from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
 from src.prompt_loader import load_prompt_with_temperature
 from src.i18n import translate, get_user_language
-from src.gdpr_compliance import show_consent_banner, show_gdpr_sidebar, show_third_party_disclosure
+from src.gdpr_compliance import show_consent_banner, show_gdpr_footer, show_third_party_disclosure
+from src.cost_tracker import initialize_cost_tracker, get_cost_badge, should_warn, is_blocked, track_query_cost
 
 # Initialize LangSmith client for manual tracing
 try:
@@ -153,6 +154,9 @@ if "history_manager" not in st.session_state:
     st.session_state.session_id = session_id  # Store for GDPR access
     st.session_state.history_manager = HistoryManager(session_id)
 
+# Initialize cost tracker for this session
+initialize_cost_tracker()
+
 # Run cleanup on every app load (targets old sessions, doesn't affect current one)
 history_enabled = os.getenv("HISTORY_ENABLED", "true").lower() in ("true", "1", "yes")
 if history_enabled:
@@ -177,6 +181,21 @@ if is_mobile:
 
 st.title(translate("title"))
 st.markdown(translate("description"))
+
+# Display budget info and cost badge
+st.info(translate("budget_info"))
+col1, col2 = st.columns([3, 1])
+with col2:
+    st.markdown(get_cost_badge())
+
+# Show warning if approaching budget limit
+if should_warn() and not is_blocked():
+    st.warning("⚠️ **Budget Warning**: You're using 80% of your free $0.50 budget. Next questions may not be answered.")
+
+# Show blocking message if budget exceeded
+if is_blocked():
+    st.error("🛑 **Budget Limit Reached**: You've used your $0.50 free budget. Please start a new session or upgrade your plan.")
+    st.stop()
 
 
 def save_uploaded(uploaded_file):
@@ -357,16 +376,8 @@ def log_to_history(mode: str, question: str, result: dict, document_name: str) -
 
 
 def render_history_sidebar() -> None:
-    """Display GDPR compliance options and history tracking."""
-    # Show GDPR data management options
-    show_gdpr_sidebar(
-        session_id=str(st.session_state.get("session_id", "unknown")),
-        history_manager=st.session_state.get("history_manager"),
-        feedback_manager=None
-    )
-    
-    # Show third-party service disclosures
-    show_third_party_disclosure()
+    """Sidebar is now empty - GDPR features moved to footer."""
+    pass
 
 
 def render_chat_history() -> None:
@@ -706,6 +717,12 @@ if st.session_state.document_text:
                 print(f"[CHAT] Got result with keys: {list(result.keys())}", file=sys.stderr)
                 print(f"[CHAT] Result raw_answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
                 
+                # Track cost for this query
+                prompt_tokens = result.get("prompt_tokens", 0)
+                completion_tokens = result.get("completion_tokens", 0)
+                track_query_cost(prompt_tokens, completion_tokens)
+                print(f"[COST] Tracked query cost: {prompt_tokens} input + {completion_tokens} output tokens", file=sys.stderr)
+                
                 # Log to history
                 print(f"[CHAT] Calling log_to_history...", file=sys.stderr)
                 log_to_history(mode, question, result, st.session_state.get("uploaded_name", "unknown"))
@@ -727,3 +744,10 @@ else:
     # No document uploaded yet
     question = None
     can_run = False
+
+# Display GDPR footer at the bottom of every page
+show_gdpr_footer(
+    session_id=str(st.session_state.get("session_id", "unknown")),
+    history_manager=st.session_state.get("history_manager"),
+    feedback_manager=None
+)

@@ -14,6 +14,7 @@ TRANSLATIONS = {
     "en": {
         "title": "AI DocuSearch",
         "description": "Don't remember what a document is all about? Upload your document, ask a question, and get instant answers using AI.",
+        "budget_info": "Try for FREE: you can ask ~25 questions on a ~100 page document. Larger documents will support fewer questions.",
         "upload_prompt": "Upload a PDF, DOCX or TXT file",
         "file_saved": "📁 File saved",
         "extracting": "⏳ Extracting text from document...",
@@ -38,6 +39,7 @@ TRANSLATIONS = {
     "ro": {
         "title": "AI DocuSearch",
         "description": "Nu-ți amintești ce conține un document? Încarcă documentul tău, pune o întrebare și obține răspunsuri instantanee folosind IA.",
+        "budget_info": "Încearcă gratuit: poți pune ~25 de întrebări pe un document de ~100 de pagini. Documentele mai mari vor suporta mai puține întrebări.",
         "upload_prompt": "Încarcă un fișier PDF, DOCX sau TXT",
         "file_saved": "📁 Fișier salvat",
         "extracting": "⏳ Se extrage textul din document...",
@@ -62,6 +64,7 @@ TRANSLATIONS = {
     "fr": {
         "title": "AI DocuSearch",
         "description": "Vous ne vous souvenez pas de quoi parle un document? Téléchargez votre document, posez une question et obtenez des réponses instantanées en utilisant l'IA.",
+        "budget_info": "Essayez gratuitement: vous pouvez poser ~25 questions sur un document d'environ 100 pages. Les documents plus volumineux supporteront moins de questions.",
         "upload_prompt": "Télécharger un fichier PDF, DOCX ou TXT",
         "file_saved": "📁 Fichier enregistré",
         "extracting": "⏳ Extraction du texte du document...",
@@ -86,6 +89,7 @@ TRANSLATIONS = {
     "es": {
         "title": "AI DocuSearch",
         "description": "¿No recuerdas de qué trata un documento? Carga tu documento, haz una pregunta y obtén respuestas instantáneas usando IA.",
+        "budget_info": "Prueba gratis: puedes hacer ~25 preguntas en un documento de ~100 páginas. Los documentos más grandes soportarán menos preguntas.",
         "upload_prompt": "Carga un archivo PDF, DOCX o TXT",
         "file_saved": "📁 Archivo guardado",
         "extracting": "⏳ Extrayendo texto del documento...",
@@ -110,6 +114,7 @@ TRANSLATIONS = {
     "de": {
         "title": "AI DocuSearch",
         "description": "Erinnerst du dich nicht, worum es in einem Dokument geht? Lade dein Dokument hoch, stelle eine Frage und erhalte sofortige Antworten mit KI.",
+        "budget_info": "Kostenlos testen: Du kannst ~25 Fragen zu einem ~100-seitigen Dokument stellen. Größere Dokumente ermöglichen weniger Fragen.",
         "upload_prompt": "PDF-, DOCX- oder TXT-Datei hochladen",
         "file_saved": "📁 Datei gespeichert",
         "extracting": "⏳ Text aus Dokument wird extrahiert...",

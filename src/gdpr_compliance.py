@@ -13,6 +13,7 @@ import json
 import streamlit as st
 from datetime import datetime
 from pathlib import Path
+from src.cost_tracker import export_cost_data
 
 
 def get_consent_key() -> str:
@@ -78,6 +79,7 @@ def export_user_data(session_id: str, history_manager, feedback_manager=None) ->
         "data": {
             "questions_and_answers": [],
             "feedback": [],
+            "cost_tracking": {},
             "metadata": {
                 "total_questions": 0,
                 "total_feedback_entries": 0,
@@ -86,6 +88,19 @@ def export_user_data(session_id: str, history_manager, feedback_manager=None) ->
             }
         }
     }
+    
+    # Export cost tracking data
+    try:
+        cost_data = export_cost_data()
+        data["data"]["cost_tracking"] = {
+            "total_cost_usd": cost_data.get("total_cost_usd"),
+            "remaining_budget_usd": cost_data.get("remaining_budget_usd"),
+            "budget_percentage": cost_data.get("budget_percentage"),
+            "queries_count": cost_data.get("queries_count"),
+            "budget_limit_usd": 0.50,
+        }
+    except Exception as e:
+        print(f"[GDPR] Error exporting cost data: {e}")
     
     # Export chat history
     try:
@@ -167,84 +182,73 @@ def delete_user_data(session_id: str, history_manager, feedback_manager=None) ->
 
 def show_gdpr_sidebar(session_id: str, history_manager, feedback_manager=None):
     """
-    Display GDPR compliance options in the sidebar.
-    
-    Provides:
-    - Download my data (right to portability)
-    - Delete my data (right to erasure)
-    - Privacy policy & terms links
+    DEPRECATED: Use show_gdpr_footer instead.
+    This function is kept for backwards compatibility.
     """
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🔒 **Privacy & Data**")
+    pass
+
+
+def show_gdpr_footer(session_id: str, history_manager, feedback_manager=None):
+    """
+    Display GDPR compliance links at the bottom of the page (footer).
     
-    # Data Export
-    with st.sidebar.expander("📥 Download My Data"):
-        st.write("Export all your personal data (GDPR right to data portability)")
-        st.info(
-            "This includes:\n"
-            "- All your questions and answers\n"
-            "- Feedback and ratings\n"
-            "- Session metadata\n"
-            "- Format: JSON (portable)"
-        )
-        
-        if st.button("📥 Export as JSON", use_container_width=True, key="export_data"):
+    Links open in new windows and include:
+    - Download data (right to portability)
+    - Delete data (right to erasure)
+    - Privacy Policy
+    - Terms of Service
+    - Third-party services
+    """
+    st.markdown("---")
+    st.markdown("### 🔒 Privacy & Data Management")
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        if st.button("📥 Download Data", use_container_width=True, help="Export your data (GDPR right to portability)"):
             try:
                 user_data = export_user_data(session_id, history_manager, feedback_manager)
                 json_str = json.dumps(user_data, indent=2, ensure_ascii=False)
                 
                 st.download_button(
-                    label="💾 Download JSON File",
+                    label="💾 Save JSON",
                     data=json_str,
                     file_name=f"docusearch_data_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"download_{session_id}"
                 )
-                st.success("✅ Your data is ready to download!")
+                st.success("✅ Your data is ready!")
             except Exception as e:
-                st.error(f"❌ Error exporting data: {e}")
+                st.error(f"❌ Error: {e}")
     
-    # Data Deletion
-    with st.sidebar.expander("🗑️ Delete My Data"):
-        st.write("Permanently delete all your data (GDPR right to erasure)")
-        st.warning(
-            "⚠️ **This action is irreversible!**\n\n"
-            "This will delete:\n"
-            "- All questions and answers\n"
-            "- All feedback and ratings\n"
-            "- All session history\n"
-            "- All metadata"
-        )
-        
-        if st.button("🗑️ Delete ALL My Data", use_container_width=True, key="delete_data"):
-            if st.checkbox("I understand this is permanent and irreversible"):
+    with col2:
+        if st.button("🗑️ Delete Data", use_container_width=True, help="Delete all your data (GDPR right to erasure)"):
+            st.warning("⚠️ This will permanently delete ALL your data!")
+            if st.checkbox("I understand - delete everything", key=f"confirm_delete_{session_id}"):
                 if delete_user_data(session_id, history_manager, feedback_manager):
-                    st.success("✅ All your data has been permanently deleted!")
-                    st.info("You can now upload a new document and start fresh.")
+                    st.success("✅ All data deleted!")
                     st.rerun()
                 else:
-                    st.error("❌ Error deleting data. Please try again.")
+                    st.error("❌ Error deleting data")
     
-    # Legal Documents
-    with st.sidebar.expander("📋 Legal Documents"):
-        st.write("View our legal policies:")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("[📜 Privacy Policy](PRIVACY_POLICY.md)")
-        with col2:
-            st.markdown("[📜 Terms of Service](TERMS_OF_SERVICE.md)")
-        
-        st.markdown("---")
-        st.write("**Your Rights under GDPR:**")
-        st.markdown("""
-        - ✅ Right to Access - Download your data
-        - ✅ Right to Erasure - Delete your data
-        - ✅ Right to Data Portability - Get data in portable format
-        - ✅ Right to Restrict Processing - Contact us
-        - ✅ Right to Object - Opt out of tracking
-        
-        **Questions?** Contact: [your-email] or [GitHub link]
-        """)
+    with col3:
+        st.markdown("[📜 Privacy Policy](PRIVACY_POLICY.md)")
+    
+    with col4:
+        st.markdown("[📋 Terms of Service](TERMS_OF_SERVICE.md)")
+    
+    with col5:
+        st.markdown("[🔗 Third Parties](#)")
+    
+    st.markdown("""
+    **Your GDPR Rights:**
+    - ✅ Access your data (📥 Download)
+    - ✅ Delete your data (🗑️ Delete)
+    - ✅ Data portability (JSON format)
+    - ✅ Restrict processing
+    - ✅ Object to tracking
+    """)
 
 
 def show_third_party_disclosure():
@@ -282,6 +286,7 @@ __all__ = [
     "show_consent_banner",
     "export_user_data",
     "delete_user_data",
+    "show_gdpr_footer",
     "show_gdpr_sidebar",
     "show_third_party_disclosure",
     "get_consent_key",
