@@ -255,7 +255,7 @@ def show_third_party_disclosure():
     """
     Show disclosure about third-party data sharing.
     """
-    with st.sidebar.expander("🔗 Third-Party Services"):
+    with st.expander("🔗 Third-Party Services"):
         st.markdown("""
         **Your data may be shared with:**
         
