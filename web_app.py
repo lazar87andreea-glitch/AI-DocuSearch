@@ -101,6 +101,7 @@ from src.prompt_loader import load_prompt_with_temperature
 from src.i18n import translate, get_user_language
 from src.gdpr_compliance import show_consent_banner, show_gdpr_footer, show_third_party_disclosure
 from src.cost_tracker import initialize_cost_tracker, get_cost_badge, should_warn, is_blocked, track_query_cost
+from src.feedback_manager import FeedbackManager
 
 # Initialize LangSmith client for manual tracing
 try:
@@ -148,11 +149,12 @@ _langsmith_config = verify_langsmith_config()
 
 st.set_page_config(page_title="AI DocuSearch", layout="wide")
 
-# Initialize history manager for this session
+# Initialize history manager and feedback manager for this session
 if "history_manager" not in st.session_state:
     session_id = str(hash((st.session_state.session_id if hasattr(st.session_state, 'session_id') else id(st.session_state))) % (10 ** 8))
     st.session_state.session_id = session_id  # Store for GDPR access
     st.session_state.history_manager = HistoryManager(session_id)
+    st.session_state.feedback_manager = FeedbackManager(session_id)
 
 # Initialize cost tracker for this session
 initialize_cost_tracker()
@@ -216,6 +218,7 @@ def run_rag(file_path: str, question: str, document_info: str = "Unknown") -> di
     result["build_seconds"] = build_seconds
     result["total_seconds"] += build_seconds
     result["fallback_reason"] = None
+    result["mode"] = "RAG"
     return result
 
 
@@ -275,9 +278,11 @@ def run_hybrid(file_path: str, document_text: str, question: str, document_info:
             print(f"[HYBRID] RAG returned inconclusive answer. Trying Direct LLM for better results...", file=sys.stderr)
             fallback_result = run_direct(document_text, question, document_info=document_info)
             fallback_result["fallback_reason"] = "RAG found insufficient information in document"
+            fallback_result["mode"] = "Hybrid (fallback to DirectLLM)"
             print(f"[HYBRID] Direct LLM fallback succeeded, answer length: {len(fallback_result.get('raw_answer', ''))} chars", file=sys.stderr)
             return fallback_result
         
+        result["mode"] = "Hybrid (RAG)"
         return result
     except Exception as e:
         print(f"[HYBRID] RAG failed: {type(e).__name__}: {e}", file=sys.stderr)
@@ -286,6 +291,7 @@ def run_hybrid(file_path: str, document_text: str, question: str, document_info:
         print(f"[HYBRID] Falling back to Direct LLM mode...", file=sys.stderr)
         result = run_direct(document_text, question, document_info=document_info)
         result["fallback_reason"] = f"{type(e).__name__}: {e}"
+        result["mode"] = "Hybrid (fallback to DirectLLM)"
         print(f"[HYBRID] Direct LLM fallback succeeded, answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
         return result
 
@@ -319,10 +325,59 @@ def render_metrics(result: dict):
             st.write(f"- ⚠ Ran in lite/keyword-search mode{f' (fallback cause: {reason})' if reason else ''}")
 
 
+def render_feedback(answer_id: str, question: str, result: dict) -> None:
+    """Render feedback buttons (thumbs up/down) for the answer."""
+    st.markdown("---")
+    st.markdown("**👍 Was this answer helpful?**")
+    
+    col1, col2, col3 = st.columns([1, 1, 3])
+    
+    feedback_manager = st.session_state.get("feedback_manager")
+    document_name = st.session_state.get("uploaded_name", "unknown")
+    
+    with col1:
+        if st.button("👍 Helpful", key=f"feedback_positive_{answer_id}"):
+            feedback_manager.add_feedback(
+                answer_id=answer_id,
+                rating=True,
+                question=question,
+                document=document_name,
+                comment="",
+                feedback_type="answer_rating",
+                mode=result.get("mode", "Hybrid"),
+                context_chars=result.get("context_chars", 0),
+                chunk_count=result.get("chunk_count", 0),
+                elapsed_seconds=result.get("total_seconds", 0)
+            )
+            st.success("✅ Thanks for the feedback!")
+            print(f"[FEEDBACK] Positive feedback for {answer_id}", file=sys.stderr)
+    
+    with col2:
+        if st.button("👎 Not helpful", key=f"feedback_negative_{answer_id}"):
+            feedback_manager.add_feedback(
+                answer_id=answer_id,
+                rating=False,
+                question=question,
+                document=document_name,
+                comment="",
+                feedback_type="answer_rating",
+                mode=result.get("mode", "Hybrid"),
+                context_chars=result.get("context_chars", 0),
+                chunk_count=result.get("chunk_count", 0),
+                elapsed_seconds=result.get("total_seconds", 0)
+            )
+            st.warning("📝 We'll use this to improve!")
+            print(f"[FEEDBACK] Negative feedback for {answer_id}", file=sys.stderr)
+
+
 def render_result(mode_key: str, result: dict):
-    """Show the answer, then a toggle button that reveals metrics on demand."""
+    """Show the answer, feedback buttons, then a toggle button that reveals metrics on demand."""
     st.subheader("Answer")
     st.write(result["raw_answer"])
+
+    # Render feedback buttons
+    answer_id = f"ans_{int(time.time() * 1000)}_{mode_key}"
+    render_feedback(answer_id, st.session_state.get("last_question", ""), result)
 
     show_flag = f"show_metrics_{mode_key}"
     if show_flag not in st.session_state:
@@ -452,16 +507,17 @@ def render_chat_history() -> None:
             justify-content: flex-end;
         }
         .chat-avatar {
-            width: 36px;
-            height: 36px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
             color: white;
-            font-size: 14px;
+            font-size: 24px;
             flex-shrink: 0;
+            line-height: 1;
         }
         .chat-avatar.user {
             background-color: #4caf50;
@@ -723,6 +779,9 @@ if st.session_state.document_text:
     st.markdown("</div>", unsafe_allow_html=True)
     
     if question:
+        # Store question for feedback
+        st.session_state.last_question = question
+        
         # Show processing message
         with st.spinner(translate("processing")):
             try:
@@ -776,5 +835,5 @@ else:
 show_gdpr_footer(
     session_id=str(st.session_state.get("session_id", "unknown")),
     history_manager=st.session_state.get("history_manager"),
-    feedback_manager=None
+    feedback_manager=st.session_state.get("feedback_manager")
 )
