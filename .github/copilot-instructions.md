@@ -57,8 +57,11 @@ python test_langsmith.py
   `src/pipeline.py` -> `src/ai_query.py`. `src/prompt_loader.py` keeps prompt text and sampling
   configuration outside Python code.
 - `src/ingest.py` handles searchable PDFs with `pypdf`, then attempts OCR with
-  `pdf2image`/Tesseract when no text layer exists. DOCX extraction includes paragraphs and tables;
-  other extensions are treated as UTF-8 text except unsupported legacy `.doc`.
+  `pdf2image`/Tesseract when no text layer exists. Includes `get_pdf_page_count()` to extract page metadata.
+  DOCX extraction includes paragraphs and tables; other extensions are treated as UTF-8 text except unsupported legacy `.doc`.
+- `src/i18n.py` provides automatic language detection (from browser Accept-Language header or IP geolocation),
+  translation of all UI strings, and language-aware LLM prompts. Supports English, Romanian, French, Spanish, German.
+  Language preference is cached in `st.session_state` and can be manually overridden via sidebar selector.
 - `src/embed_index.py` lazily loads `all-MiniLM-L6-v2`, prefers FAISS cosine search, falls back to
   NumPy similarity, and finally to token-overlap search when embeddings cannot be used.
 - `src/ai_query.py` calls any OpenAI-compatible `/chat/completions` endpoint and returns answer,
@@ -76,8 +79,11 @@ python test_langsmith.py
   `raw_answer`, `source_chunks`, `lite_mode`, build/retrieval/generation/total timings,
   `chunk_count`, `context_chars`, token counts, `estimated_tokens`, `used_live_api`,
   `temperature`, and (in web modes) `fallback_reason`.
-- Prompt templates live in `prompts/` and use Python `str.format` placeholders. RAG requires
-  `{context}` and `{question}`; Direct LLM requires `{document_text}` and `{question}`.
+- Prompt templates live in `prompts/` and use Python `str.format` placeholders. Both RAG and Direct LLM require:
+  - `{context}` or `{document_text}` — document content
+  - `{question}` — user question
+  - `{document_info}` — document metadata (filename, page count, etc.)
+  - Prompts should instruct LLM to "Respond in the same language as the question"
 - Tune each prompt with an optional first line such as `# temperature: 0.2`. Temperature precedence
   is: explicit function argument, prompt-file directive, `LLM_TEMPERATURE`, then `0.2`.
 - Prefer provider-neutral `LLM_API_KEY`, `LLM_API_BASE`, and `LLM_MODEL`. The provider-specific
@@ -86,8 +92,9 @@ python test_langsmith.py
 - Keep the BLAS thread-limit environment variables at the top of `web_app.py`, before importing
   Streamlit or modules that can load NumPy/model code; they protect low-memory deployments.
 - Streamlit reruns are coordinated through `st.session_state`: a new upload or changed question
-  clears prior mode results, while metric visibility and comparison state persist across reruns.
-- Mobile mode intentionally exposes Direct LLM only; desktop exposes RAG, Direct LLM, and Hybrid.
+  clears prior mode results, while metric visibility, language preference, and comparison state persist across reruns.
+- Language detection is cached in `st.session_state.user_language` and persists across reruns.
+  Users can manually override via the language selector in the sidebar, which triggers `st.rerun()`.
 - OCR can require `TESSERACT_CMD` and `POPPLER_PATH` locally. Streamlit Cloud obtains Tesseract and
   Poppler from `packages.txt`.
 - Keep credentials out of source control. `.env` and `.streamlit/` are ignored; update

@@ -19,18 +19,29 @@ The app intelligently attempts retrieval-augmented generation (RAG) with full em
 If that fails (low memory, model unavailable), it seamlessly falls back to direct LLM processing.
 This ensures best-quality answers with reliable fallback behavior.
 
-### 2. Retrieval first, fallback second
+### 2. Multilingual and Localized Responses
+The UI automatically detects user language from browser headers or IP geolocation.
+The LLM is instructed to respond in the user's question language.
+All UI strings (upload prompts, messages, etc.) are translated to the user's language.
+Manual language selector in sidebar for override.
+
+### 3. Document-aware and metadata-rich
+The system extracts and tracks document metadata (page count for PDFs).
+This information is passed to the LLM so users can ask "How many pages?" and get accurate answers.
+All document properties are accessible in prompts.
+
+### 4. Retrieval first, fallback second
 When resources permit, retrieve the most relevant sections of a document before answering. 
 This reduces hallucination and keeps answers anchored to the actual content.
 If retrieval isn't available, fall back to the full document text.
 
-### 3. Stability over complexity
+### 5. Stability over complexity
 For low-memory or low-resource environments, the system gracefully adapts to ensure usability.
 No crashes, no frozen UI, no failed downloads — just reliable answers.
 
 ## Current Status & Feature Completion
 
-**Overall:** ✅ ~90% Complete — Core RAG pipeline production-ready; observability, feedback collection, and UI polish complete
+**Overall:** ✅ ~95% Complete — Core RAG pipeline production-ready; multilingual support, feedback collection, and UI polish complete
 
 | Step | Module | Status | Notes |
 |------|--------|--------|-------|
@@ -42,7 +53,8 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 | **Step 6** | History Tracking | ✅ 95% | Hybrid storage (in-memory + disk) working; sidebar UI deferred |
 | **Step 7** | Cloud Deployment | ⚠️ 80% | Deploys; secrets loading partially hardened; needs testing |
 | **Step 8** | Feedback Collection | ✅ Complete | Thumbs up/down ratings, detailed feedback, per-session isolation |
-| **UI Chat** | Streamlit App | ✅ Complete | Hybrid mode only, chat bubbles, responsive mobile |
+| **Step 9** | Internationalization | ✅ Complete | Multilingual UI, auto language detection, document metadata |
+| **UI Chat** | Streamlit App | ✅ Complete | Hybrid mode only, chat bubbles, responsive mobile, page count |
 | **UI Metrics** | Display | ⚠️ Removed | User preference; metrics no longer shown in default view |
 
 ---
@@ -55,7 +67,10 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 - 💾 **Persistent history:** Dual-layer storage (session cache + disk JSON per user)
 - 📊 **LangSmith tracing:** Manual Client-based tracing for debugging
 - 📋 **User feedback collection:** Thumbs up/down ratings + detailed feedback + analytics export
-- 🌍 **Responsive design:** Desktop + mobile optimized
+- 🌍 **Multilingual support:** Auto-detected language, translated UI (English, Romanian, French, Spanish, German)
+- 📄 **Document metadata:** Automatic page count detection for PDFs, metadata accessible to LLM
+- 🗣️ **Language-aware responses:** LLM responds in the user's question language
+- 🌐 **Responsive design:** Desktop + mobile optimized
 - 🛡️ **Stability:** Graceful fallbacks for memory/model/API failures
 
 ---
@@ -93,6 +108,7 @@ AI DocuSearch/
 │   ├── embed_index.py
 │   ├── feedback_manager.py            # User feedback collection (NEW)
 │   ├── history_manager.py
+│   ├── i18n.py                        # Internationalization & multilingual support (NEW)
 │   ├── ingest.py
 │   ├── pipeline.py
 │   ├── preprocess.py

@@ -94,10 +94,11 @@ def _initialize_langsmith():
 traceable = _initialize_langsmith()
 
 # NOW import src modules (they will use traceable decorator with env vars set)
-from src.ingest import extract_text
+from src.ingest import extract_text, get_pdf_page_count
 from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
 from src.prompt_loader import load_prompt_with_temperature
+from src.i18n import translate, get_user_language, add_language_selector_sidebar
 
 # Initialize LangSmith client for manual tracing
 try:
@@ -143,7 +144,7 @@ def verify_langsmith_config():
 # Check config on startup (cached, runs once per session)
 _langsmith_config = verify_langsmith_config()
 
-st.set_page_config(page_title="DocuSearch", layout="wide")
+st.set_page_config(page_title="AI DocuSearch", layout="wide")
 
 # Initialize history manager for this session
 if "history_manager" not in st.session_state:
@@ -185,11 +186,11 @@ def save_uploaded(uploaded_file):
 
 
 @traceable(run_type="chain", name="web_app.rag_mode")
-def run_rag(file_path: str, question: str) -> dict:
+def run_rag(file_path: str, question: str, document_info: str = "Unknown") -> dict:
     t0 = time.perf_counter()
     pipeline = build_pipeline(file_path, use_embeddings=True)
     build_seconds = time.perf_counter() - t0
-    result = answer_question(pipeline, question)
+    result = answer_question(pipeline, question, document_info=document_info)
     result["build_seconds"] = build_seconds
     result["total_seconds"] += build_seconds
     result["fallback_reason"] = None
@@ -197,8 +198,8 @@ def run_rag(file_path: str, question: str) -> dict:
 
 
 @traceable(run_type="chain", name="web_app.direct_llm_mode")
-def run_direct(document_text: str, question: str) -> dict:
-    prompt, temperature = load_prompt_with_temperature("direct_llm_prompt", document_text=document_text, question=question)
+def run_direct(document_text: str, question: str, document_info: str = "Unknown") -> dict:
+    prompt, temperature = load_prompt_with_temperature("direct_llm_prompt", document_text=document_text, question=question, document_info=document_info)
     meta = generate_answer_with_meta(prompt, temperature=temperature)
     return {
         "query": question,
@@ -222,11 +223,11 @@ def run_direct(document_text: str, question: str) -> dict:
 
 
 @traceable(run_type="chain", name="web_app.hybrid_mode")
-def run_hybrid(file_path: str, document_text: str, question: str) -> dict:
+def run_hybrid(file_path: str, document_text: str, question: str, document_info: str = "Unknown") -> dict:
     print(f"[HYBRID] Starting Hybrid mode for question: {question[:50]}...", file=sys.stderr)
     try:
         print(f"[HYBRID] Attempting RAG pipeline...", file=sys.stderr)
-        result = run_rag(file_path, question)
+        result = run_rag(file_path, question, document_info=document_info)
         print(f"[HYBRID] RAG succeeded, answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
         return result
     except Exception as e:
@@ -234,7 +235,7 @@ def run_hybrid(file_path: str, document_text: str, question: str) -> dict:
         import traceback
         traceback.print_exc(file=sys.stderr)
         print(f"[HYBRID] Falling back to Direct LLM mode...", file=sys.stderr)
-        result = run_direct(document_text, question)
+        result = run_direct(document_text, question, document_info=document_info)
         result["fallback_reason"] = f"{type(e).__name__}: {e}"
         print(f"[HYBRID] Direct LLM fallback succeeded, answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
         return result
@@ -554,6 +555,8 @@ if "file_path" not in st.session_state:
     st.session_state.file_path = None
 if "document_text" not in st.session_state:
     st.session_state.document_text = None
+if "page_count" not in st.session_state:
+    st.session_state.page_count = None
 if "extraction_seconds" not in st.session_state:
     st.session_state.extraction_seconds = None
 if "results" not in st.session_state:
@@ -565,7 +568,7 @@ if "chat_history" not in st.session_state:
 if "loaded_docs" not in st.session_state:
     st.session_state.loaded_docs = set()
 
-uploaded = st.file_uploader("Upload a PDF, DOCX or TXT file", type=["pdf", "docx", "txt"])
+uploaded = st.file_uploader(translate("upload_prompt"), type=["pdf", "docx", "txt"])
 
 if uploaded is not None:
     if st.session_state.get("uploaded_name") != uploaded.name:
@@ -575,25 +578,37 @@ if uploaded is not None:
         # Save file
         try:
             st.session_state.file_path = save_uploaded(uploaded)
-            st.info(f"📁 File saved: {uploaded.name} ({uploaded.size} bytes)")
+            st.info(f"{translate('file_saved')}: {uploaded.name} ({uploaded.size} bytes)")
         except Exception as e:
-            st.error(f"❌ Failed to save file: {e}")
+            st.error(f"{translate('failed_save')}: {e}")
             st.session_state.document_text = None
+            st.session_state.page_count = None
             st.session_state.file_path = None
             import traceback
             traceback.print_exc()
         
         # Extract text
         if st.session_state.file_path:
-            st.info("⏳ Extracting text from document...")
+            st.info(translate("extracting"))
             t0 = time.perf_counter()
             try:
                 st.session_state.document_text = extract_text(st.session_state.file_path)
                 st.session_state.extraction_seconds = time.perf_counter() - t0
                 size_mb = len(st.session_state.document_text) / (1024 * 1024)
+                
+                # Get page count if it's a PDF
+                st.session_state.page_count = None
+                if st.session_state.file_path.lower().endswith('.pdf'):
+                    st.session_state.page_count = get_pdf_page_count(st.session_state.file_path)
+                
+                page_info = ""
+                if st.session_state.page_count:
+                    page_info = f", {st.session_state.page_count} {translate('pages')}"
+                
                 st.success(
-                    f"✅ Extracted {len(st.session_state.document_text)} chars ({size_mb:.2f} MB) "
-                    f"in {st.session_state.extraction_seconds:.2f}s"
+                    f"{translate('extracted')} {len(st.session_state.document_text)} {translate('chars')} "
+                    f"({size_mb:.2f} {translate('mb')}){page_info} "
+                    f"{translate('in')} {st.session_state.extraction_seconds:.2f}{translate('seconds')}"
                 )
                 
                 # Load existing history for this document into session state (one-time per upload)
@@ -619,20 +634,25 @@ if uploaded is not None:
                 st.info("📌 **Tip**: For best results, use PDFs with selectable text (not scanned images). "
                        "If you have a scanned PDF in a non-English language, OCR may need configuration.")
                 st.session_state.document_text = None
+                st.session_state.page_count = None
                 print(f"[WARNING] Text extraction (OCR): {e}", file=sys.stderr)
             except Exception as e:
-                st.error(f"❌ Failed to extract text: {type(e).__name__}: {e}")
+                st.error(f"{translate('failed_extract')}: {type(e).__name__}: {e}")
                 st.session_state.document_text = None
+                st.session_state.page_count = None
                 print(f"[ERROR] Text extraction failed: {e}", file=sys.stderr)
                 import traceback
                 traceback.print_exc()
 else:
     # No file uploaded yet - show helpful message
     if "uploaded_name" not in st.session_state:
-        st.info("👆 Please upload a document to get started")
+        st.info(translate("upload_first"))
 
 # Render history sidebar
 render_history_sidebar()
+
+# Add language selector to sidebar
+add_language_selector_sidebar()
 
 # Initialize chat history for conversation
 if "chat_messages" not in st.session_state:
@@ -645,8 +665,6 @@ if st.session_state.document_text:
     
     # Hybrid mode is the only mode
     mode = "Hybrid"
-    st.markdown("### 🤖 Intelligent Document Q&A (Hybrid Mode)")
-    st.caption("Optimized retrieval with automatic fallback for reliability")
     
     st.markdown("---")
     
@@ -656,20 +674,28 @@ if st.session_state.document_text:
     st.markdown("---")
     
     # Chat input
-    question = st.chat_input("Ask a question about the document...", key="chat_input")
+    question = st.chat_input(translate("ask_question"), key="chat_input")
     
     st.markdown("</div>", unsafe_allow_html=True)
     
     if question:
         # Show processing message
-        with st.spinner("⏳ Processing your question..."):
+        with st.spinner(translate("processing")):
             try:
                 print(f"[CHAT] Processing question with Hybrid mode", file=sys.stderr)
                 print(f"[CHAT] uploaded_name: {st.session_state.get('uploaded_name')}", file=sys.stderr)
                 
+                # Prepare document info for the LLM
+                document_info_parts = []
+                if st.session_state.get("uploaded_name"):
+                    document_info_parts.append(f"Document: {st.session_state.get('uploaded_name')}")
+                if st.session_state.get("page_count"):
+                    document_info_parts.append(f"Pages: {st.session_state.get('page_count')}")
+                document_info = " | ".join(document_info_parts) if document_info_parts else "Unknown"
+                
                 # Always use Hybrid mode (tries RAG, falls back to Direct LLM if needed)
                 print(f"[CHAT] Running Hybrid mode", file=sys.stderr)
-                result = run_hybrid(st.session_state.file_path, st.session_state.document_text, question)
+                result = run_hybrid(st.session_state.file_path, st.session_state.document_text, question, document_info=document_info)
                 
                 print(f"[CHAT] Got result with keys: {list(result.keys())}", file=sys.stderr)
                 print(f"[CHAT] Result raw_answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
@@ -680,7 +706,7 @@ if st.session_state.document_text:
                 print(f"[CHAT] log_to_history completed", file=sys.stderr)
                 
                 # Add to chat display (will show on next render)
-                st.success(f"✅ {mode} completed!")
+                st.success(f"{translate('completed')} {mode} completed!")
                 st.rerun()
                 
             except Exception as e:

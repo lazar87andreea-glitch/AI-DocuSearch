@@ -15,6 +15,20 @@ def extract_text_from_pdf(path: str) -> str:
     return "\n".join(texts).strip()
 
 
+def get_pdf_page_count(path: str) -> int:
+    """Get the number of pages in a PDF file."""
+    try:
+        from pypdf import PdfReader
+    except Exception:
+        return 0
+    
+    try:
+        reader = PdfReader(path)
+        return len(reader.pages)
+    except Exception:
+        return 0
+
+
 def extract_text_from_pdf_ocr(path: str, poppler_path: str | None = None) -> str:
     """Fallback OCR extraction for scanned PDFs using pdf2image + pytesseract.
 

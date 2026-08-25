@@ -23,7 +23,10 @@ AI DocuSearch isn't just "chat with your PDF." It's a **full mini-RAG system** w
 - 🧬 Embedding & vector indexing (FAISS + fallback)
 - 🔍 Semantic retrieval (cosine similarity, keyword backup)
 - 🤖 LLM answer generation (Grok or custom OpenAI-compatible endpoint)
-- 📊 Metadata & token tracking
+- 📊 Metadata & token tracking (including page counts for PDFs)
+- 🌍 Automatic language detection (browser headers + IP geolocation)
+- 🗣️ Multilingual UI (English, Romanian, French, Spanish, German)
+- 💬 Language-aware LLM responses (responds in user's language)
 - 🔍 LangSmith tracing & observability
 - 📱 Mobile-friendly Streamlit UI
 - 💾 Persistent question history (per-user, per-document)

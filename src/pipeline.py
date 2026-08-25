@@ -124,7 +124,7 @@ def _lightweight_indices(chunks: list[str], question: str, top_k: int = 3) -> li
 
 @traceable(run_type="chain", name="answer_question")
 def answer_question(
-    pipeline: Dict[str, Any], question: str, top_k: int = 3, temperature: float | None = None
+    pipeline: Dict[str, Any], question: str, top_k: int = 3, temperature: float | None = None, document_info: str = "Unknown"
 ) -> Dict[str, Any]:
     chunks = pipeline.get("chunks", [])
     retrieval_start = time.perf_counter()
@@ -138,7 +138,7 @@ def answer_question(
     retrieval_seconds = time.perf_counter() - retrieval_start
 
     context = "\n\n".join(chunks[i] for i in indices if i < len(chunks))
-    prompt, file_temperature = load_prompt_with_temperature("rag_prompt", context=context, question=question)
+    prompt, file_temperature = load_prompt_with_temperature("rag_prompt", context=context, question=question, document_info=document_info)
     meta = generate_answer_with_meta(prompt, temperature=temperature if temperature is not None else file_temperature)
 
     return {

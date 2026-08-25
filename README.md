@@ -9,9 +9,12 @@ This project is designed to be simple, explainable, and Git-friendly while remai
 AI DocuSearch supports:
 - **PDF, DOCX, and TXT ingestion** — with automatic OCR fallback for scanned PDFs
 - **Multi-language support** — OCR works with Romanian, English, and other languages (via Tesseract)
+- **Multilingual UI** — Automatic language detection from browser/IP, with manual language selector (English, Romanian, French, Spanish, German)
+- **Document metadata** — Automatic page count detection for PDFs (users can ask "How many pages?")
 - **Cleaning and chunking for retrieval**
 - **Lightweight retrieval fallback** for low-memory environments
 - **Live LLM integration** with any OpenAI-compatible provider (OpenAI, xAI/Grok, Groq, etc.)
+- **Language-aware LLM responses** — LLM automatically responds in the user's question language
 - **Browser-based Streamlit app** — runs Hybrid mode with intelligent fallback and performance metrics
 - **Mobile-optimized UI** — responsive design for Android, iOS, and desktop browsers
 - **Streamlit Cloud ready** — deploy in minutes with Secrets configuration
@@ -67,10 +70,12 @@ AI DocuSearch/
 ├── src/
 │   ├── ai_query.py
 │   ├── embed_index.py
+│   ├── i18n.py                     # Internationalization (multilingual support)
 │   ├── ingest.py
 │   ├── pipeline.py
 │   ├── preprocess.py
-│   └── prompt_loader.py
+│   ├── prompt_loader.py
+│   └── history_manager.py
 ├── prompts/
 │   ├── rag_prompt.txt
 │   └── direct_llm_prompt.txt
