@@ -26,6 +26,33 @@ def _estimate_tokens(text: str) -> int:
     return max(0, len(text) // 4) if text else 0
 
 
+def _get_langsmith_client() -> Optional[Any]:
+    """Get or create a cached LangSmith Client, with proper environment setup.
+    
+    Returns None if LangSmith is not properly configured.
+    """
+    try:
+        # Only attempt to create if we have the required environment
+        if not os.getenv("LANGSMITH_API_KEY"):
+            print(f"[LANGSMITH] Cannot create client: LANGSMITH_API_KEY not set", file=sys.stderr)
+            return None
+        
+        if os.getenv("LANGSMITH_TRACING", "").lower() != "true":
+            print(f"[LANGSMITH] Cannot create client: LANGSMITH_TRACING not set to 'true'", file=sys.stderr)
+            return None
+        
+        from langsmith import Client
+        print(f"[LANGSMITH] Creating Client with project: {os.getenv('LANGSMITH_PROJECT', 'default')}", file=sys.stderr)
+        client = Client()
+        print(f"[LANGSMITH] Client created successfully", file=sys.stderr)
+        return client
+    except Exception as e:
+        print(f"[LANGSMITH] Failed to create Client: {type(e).__name__}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return None
+
+
 def generate_answer_with_meta(
     prompt: str, model_name: Optional[str] = None, temperature: Optional[float] = None
 ) -> Dict[str, Any]:
@@ -87,16 +114,8 @@ def generate_answer_with_meta(
         print(f"[LANGSMITH_ENV] TRACING: '{langsmith_tracing}'", file=sys.stderr)
         print(f"[LANGSMITH_ENV] PROJECT: '{langsmith_project}'", file=sys.stderr)
         
-        # Initialize LangSmith client once
-        try:
-            from langsmith import Client
-            print(f"[LANGSMITH] Attempting to create Client...", file=sys.stderr)
-            _ls_client = Client()
-            print(f"[LANGSMITH] Client initialized successfully", file=sys.stderr)
-        except Exception as e:
-            print(f"[LANGSMITH] Failed to initialize client: {type(e).__name__}: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc(file=sys.stderr)
+        # Get LangSmith client (only if properly configured)
+        _ls_client = _get_langsmith_client()
         
         # Create run with question extraction
         if _ls_client:
@@ -112,9 +131,13 @@ def generate_answer_with_meta(
                         question_text = prompt.split(parts[0] + "question")[-1].strip()[:200]
                 
                 print(f"[LANGSMITH] About to call create_run...", file=sys.stderr)
+                # Use explicit project_name from env to avoid Client state issues in Streamlit
+                project_name = os.getenv("LANGSMITH_PROJECT", "default")
+                print(f"[LANGSMITH] Using project_name: {project_name}", file=sys.stderr)
                 run = _ls_client.create_run(
                     name="generate_answer",
                     run_type="llm",
+                    project_name=project_name,
                     inputs={
                         "question": question_text[:300],
                         "prompt_length": len(prompt),

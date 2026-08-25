@@ -12,7 +12,7 @@ AI DocuSearch supports:
 - **Cleaning and chunking for retrieval**
 - **Lightweight retrieval fallback** for low-memory environments
 - **Live LLM integration** with any OpenAI-compatible provider (OpenAI, xAI/Grok, Groq, etc.)
-- **Browser-based Streamlit app** — runs RAG, Direct LLM, and Hybrid modes with performance metrics
+- **Browser-based Streamlit app** — runs Hybrid mode with intelligent fallback and performance metrics
 - **Mobile-optimized UI** — responsive design for Android, iOS, and desktop browsers
 - **Streamlit Cloud ready** — deploy in minutes with Secrets configuration
 - **LangSmith tracing** — optional observability for all LLM calls
@@ -136,22 +136,16 @@ swap them for OpenAI, Groq, or another provider without changing any code.
 python -m streamlit run web_app.py
 ```
 
-After uploading a document and asking a question, use the **RAG Mode**, **Direct LLM Mode**, and
-**Hybrid Mode** tabs to run each approach and compare their results:
+After uploading a document and asking a question, the app uses **Hybrid Mode** — the most intelligent and resilient approach:
 
-- **RAG Mode** — chunks the document, builds an embedding index, retrieves the most relevant
-  chunks, then answers using only that context.
-- **Direct LLM Mode** — sends the entire extracted document text straight to the LLM, skipping
-  chunking/embeddings entirely.
-- **Hybrid Mode** — tries the full RAG pipeline first and automatically falls back to Direct LLM
-  behavior if the embedding pipeline fails (e.g. low memory).
+- **Hybrid Mode** — tries the full RAG pipeline first (chunks document, builds embedding index, retrieves relevant chunks)
+- Falls back to direct text-to-LLM if embeddings/retrieval fails (low memory, model unavailable, etc.)
+- Automatically adapts to available resources (works on mobile, desktop, low-memory environments)
+- Provides best-quality answers with reliable fallback behavior
 
-Each tab shows the answer with a **📊 Show metrics** button underneath — click it to reveal that
-run's total time, build/retrieval/generation time breakdown, chunks used, context size, and
-prompt/completion/total token counts (from the provider's `usage` field when available, otherwise
-estimated). Metrics stay hidden until requested, keeping the default view focused on the answer.
-Once two or more modes have been run, a **📊 Show mode comparison** button appears to reveal a
-side-by-side table of all of them.
+The answer is displayed with a **📊 Show metrics** button underneath — click it to reveal total time, 
+build/retrieval/generation time breakdown, chunks used, context size, and token counts. Metrics stay hidden 
+until requested, keeping the default view focused on the answer.
 
 ## Example usage
 
@@ -175,14 +169,14 @@ This means:
 - `src/ingest.py` — document ingestion and text extraction
 - `src/preprocess.py` — document cleaning and chunk splitting
 - `src/prompt_loader.py` — loads prompt templates from `prompts/`
-- `prompts/rag_prompt.txt` — prompt template used by RAG mode (and Hybrid mode when it succeeds)
-- `prompts/direct_llm_prompt.txt` — prompt template used by Direct LLM mode (and Hybrid mode when it falls back)
-- `web_app.py` — unified browser app with RAG / Direct LLM / Hybrid mode tabs and metrics
+- `prompts/rag_prompt.txt` — prompt template for retrieval-augmented generation (used when embeddings succeed)
+- `prompts/direct_llm_prompt.txt` — prompt template for direct LLM fallback (used when retrieval unavailable)
+- `web_app.py` — Streamlit browser app with Hybrid mode and performance metrics
 
 ## Adjusting temperature
 
 There is no temperature control in the UI. Instead, edit the `# temperature: <value>` line at the
-top of `prompts/rag_prompt.txt` or `prompts/direct_llm_prompt.txt` directly — e.g. change it to
+top of the prompt files (`prompts/rag_prompt.txt` and `prompts/direct_llm_prompt.txt`) — e.g. change it to
 `# temperature: 0.7` for more varied answers. This line is stripped before the prompt is sent to
 the LLM. If a prompt file has no such line, `LLM_TEMPERATURE` from `.env` is used, then `0.2`.
 
@@ -191,8 +185,8 @@ the LLM. If a prompt file has no such line, `LLM_TEMPERATURE` from `.env` is use
 Set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in `.env` (see `.env.example`) to send a run
 for every `generate_answer` call, `build_pipeline` call, and `answer_question` call to your
 [LangSmith](https://smith.langchain.com) dashboard — including latency and prompt/completion
-tokens. Runs for the unified web app also show which mode (RAG / Direct LLM / Hybrid) produced
-them, nested as a trace tree. Tracing is entirely optional: if `langsmith` isn't installed or
+tokens. Runs for the Hybrid mode also show whether RAG succeeded or fell back to Direct LLM,
+nested as a trace tree. Tracing is entirely optional: if `langsmith` isn't installed or
 tracing isn't enabled, the app behaves exactly the same with no extra network calls.
 
 **Verify LangSmith is working:** Run `python test_langsmith.py` to confirm the connection to your LangSmith project.
@@ -239,12 +233,11 @@ LANGSMITH_PROJECT = "ai-docusearch"
 
 The app is optimized for mobile browsers (Android, iOS):
 - ✅ Responsive layout (2-column metrics on mobile, 4-column on desktop)
-- ✅ Simplified UI for mobile (Direct LLM mode recommended)
-- ✅ RAG & Hybrid modes disabled on mobile (resource constraints on Streamlit Cloud)
+- ✅ Hybrid mode adapts intelligently to mobile resources (tries RAG, falls back as needed)
 - ✅ Touch-friendly buttons and text input
 - ✅ Works offline after page loads
 
-Test on mobile: Upload a document, ask a question, click "Run Direct LLM"
+Test on mobile: Upload a document and ask a question — Hybrid mode handles it automatically.
 
 ## Documentation
 

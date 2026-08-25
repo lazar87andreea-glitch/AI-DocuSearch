@@ -48,13 +48,11 @@ python test_langsmith.py
 - `web_app.py` is the Streamlit entry point. It loads `.env`, copies Streamlit Cloud secrets into
   `os.environ`, initializes LangSmith, and only then imports the `src` modules. Preserve this order:
   tracing decorators and provider configuration are resolved during module import.
-- The web app exposes three execution paths:
-  - **RAG** calls `build_pipeline(..., use_embeddings=True)` and then `answer_question()`.
-  - **Direct LLM** skips chunking/retrieval and sends the full extracted text through
-    `prompts/direct_llm_prompt.txt`.
-  - **Hybrid** tries RAG and falls back to Direct LLM only when the RAG path raises. Separately,
-    `build_pipeline()` can degrade to keyword retrieval without raising when embeddings are
-    unavailable or memory is low.
+- The web app exposes a single, intelligent **Hybrid** execution path:
+  - **Hybrid Mode** tries the full RAG pipeline first (chunking, embeddings, retrieval)
+  - Falls back to Direct LLM (full text) if RAG fails (low memory, model unavailable, etc.)
+  - Internally uses `build_pipeline(..., use_embeddings=True)` and then `answer_question()`
+  - Gracefully degrades without raising errors when embeddings are unavailable or memory is low
 - The core RAG flow is `src/ingest.py` -> `src/preprocess.py` -> `src/embed_index.py` ->
   `src/pipeline.py` -> `src/ai_query.py`. `src/prompt_loader.py` keeps prompt text and sampling
   configuration outside Python code.

@@ -163,9 +163,9 @@ if history_enabled:
 is_mobile = is_mobile_browser()
 
 if is_mobile:
-    st.warning(
-        "📱 **Mobile Mode Active**: RAG & Hybrid modes disabled. Use **Direct LLM** mode instead — "
-        "it's fast and works on all devices!"
+    st.info(
+        "📱 **Mobile Device Detected**: Hybrid mode intelligently adapts to your device's capabilities. "
+        "It will use fast, efficient processing optimized for mobile."
     )
 
 st.title("DocuSearch")
@@ -223,12 +223,20 @@ def run_direct(document_text: str, question: str) -> dict:
 
 @traceable(run_type="chain", name="web_app.hybrid_mode")
 def run_hybrid(file_path: str, document_text: str, question: str) -> dict:
+    print(f"[HYBRID] Starting Hybrid mode for question: {question[:50]}...", file=sys.stderr)
     try:
-        return run_rag(file_path, question)
+        print(f"[HYBRID] Attempting RAG pipeline...", file=sys.stderr)
+        result = run_rag(file_path, question)
+        print(f"[HYBRID] RAG succeeded, answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
+        return result
     except Exception as e:
-        print(f"[HYBRID] Full pipeline failed, falling back to direct LLM: {type(e).__name__}: {e}", file=sys.stderr)
+        print(f"[HYBRID] RAG failed: {type(e).__name__}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        print(f"[HYBRID] Falling back to Direct LLM mode...", file=sys.stderr)
         result = run_direct(document_text, question)
         result["fallback_reason"] = f"{type(e).__name__}: {e}"
+        print(f"[HYBRID] Direct LLM fallback succeeded, answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
         return result
 
 
@@ -280,10 +288,23 @@ def render_result(mode_key: str, result: dict):
 
 def log_to_history(mode: str, question: str, result: dict, document_name: str) -> None:
     """Log a query to history both in-memory and to disk."""
-    if not history_enabled or not st.session_state.history_manager:
+    print(f"[HISTORY] log_to_history called: mode={mode}, history_enabled={history_enabled}", file=sys.stderr)
+    
+    if not history_enabled:
+        print(f"[HISTORY] History disabled, skipping", file=sys.stderr)
+        return
+    
+    if not st.session_state.history_manager:
+        print(f"[HISTORY] history_manager not initialized, skipping", file=sys.stderr)
         return
     
     try:
+        # Extract answer and validate
+        answer = result.get("raw_answer", "")
+        print(f"[HISTORY] Extracted answer length: {len(answer)} chars, type: {type(answer)}", file=sys.stderr)
+        if not answer or answer.strip() == "":
+            print(f"[HISTORY] WARNING: Answer is empty!", file=sys.stderr)
+        
         # Extract metrics from result
         metrics_dict = {
             "total_seconds": result.get("total_seconds", 0),
@@ -301,28 +322,34 @@ def log_to_history(mode: str, question: str, result: dict, document_name: str) -
         entry = {
             "timestamp": datetime.now().isoformat(),
             "question": question,
-            "answer": result.get("raw_answer", ""),
+            "answer": answer,
             "mode": mode,
             "document_name": document_name,
             "metrics": metrics_dict,
         }
         
+        print(f"[HISTORY] Created entry with document_name={document_name}", file=sys.stderr)
+        
         # Add to in-memory session state (for instant display in chat)
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
         st.session_state.chat_history.append(entry)
-        print(f"[HISTORY] Added to session state: {len(st.session_state.chat_history)} entries", file=sys.stderr)
+        print(f"[HISTORY] Added to session state: {len(st.session_state.chat_history)} entries total", file=sys.stderr)
+        print(f"[HISTORY] Current chat_history document_names: {[e.get('document_name') for e in st.session_state.chat_history]}", file=sys.stderr)
         
         # Log to disk history (for analytics/CLI)
         st.session_state.history_manager.add_question(
             question=question,
-            answer=result.get("raw_answer", ""),
+            answer=answer,
             mode=mode,
             metrics_dict=metrics_dict,
             document_name=document_name
         )
+        print(f"[HISTORY] Successfully logged question to disk", file=sys.stderr)
     except Exception as e:
-        print(f"[HISTORY] Failed to log question: {e}", file=sys.stderr)
+        print(f"[HISTORY] Failed to log question: {type(e).__name__}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
 
 
 def render_history_sidebar() -> None:
@@ -336,10 +363,13 @@ def render_chat_history() -> None:
     """Display conversation history from in-memory session state with left/right aligned bubbles."""
     # Use session state first (always available in current session)
     if "chat_history" not in st.session_state or not st.session_state.chat_history:
+        print("[RENDER] No chat_history entries to display", file=sys.stderr)
         return
     
     # Get current document filter
     current_doc = st.session_state.get("uploaded_name", None)
+    print(f"[RENDER] Rendering chat history for document: {current_doc}", file=sys.stderr)
+    print(f"[RENDER] Total entries in chat_history: {len(st.session_state.chat_history)}", file=sys.stderr)
     
     # Filter history by current document if needed
     recent = [
@@ -347,10 +377,16 @@ def render_chat_history() -> None:
         if entry.get("document_name") == current_doc
     ]
     
+    print(f"[RENDER] Filtered to {len(recent)} entries for current document", file=sys.stderr)
+    
     if not recent:
+        print("[RENDER] No entries for current document, checking document names in history:", file=sys.stderr)
+        for entry in st.session_state.chat_history:
+            doc_name = entry.get('document_name')
+            print(f"[RENDER]   - {doc_name}", file=sys.stderr)
         return
     
-    print(f"[HISTORY] Rendering {len(recent)} entries from session state for {current_doc}", file=sys.stderr)
+    print(f"[RENDER] Rendering {len(recent)} entries", file=sys.stderr)
     
     # Chat styling with left/right aligned bubbles and avatars
     st.markdown("""
@@ -607,16 +643,10 @@ if st.session_state.document_text:
     # Chat container
     st.markdown("<div style='background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; @media (prefers-color-scheme: dark) { background-color: #1e1e1e; border-color: #333; }'>" , unsafe_allow_html=True)
     
-    # Mode selector at the top of chat box
-    col_mode, col_spacer = st.columns([2, 3])
-    with col_mode:
-        mode = st.radio(
-            "Select Mode:",
-            options=["Direct LLM", "RAG", "Hybrid"],
-            horizontal=True,
-            key="chat_mode_selector",
-            label_visibility="collapsed"
-        )
+    # Hybrid mode is the only mode
+    mode = "Hybrid"
+    st.markdown("### 🤖 Intelligent Document Q&A (Hybrid Mode)")
+    st.caption("Optimized retrieval with automatic fallback for reliability")
     
     st.markdown("---")
     
@@ -631,24 +661,23 @@ if st.session_state.document_text:
     st.markdown("</div>", unsafe_allow_html=True)
     
     if question:
-        # Disable RAG/Hybrid on mobile
-        if is_mobile and mode in ["RAG", "Hybrid"]:
-            st.error("❌ RAG and Hybrid modes are not available on mobile. Using Direct LLM instead.")
-            mode = "Direct LLM"
-        
         # Show processing message
-        with st.spinner(f"⏳ Processing with {mode} mode..."):
+        with st.spinner("⏳ Processing your question..."):
             try:
-                # Execute the appropriate mode
-                if mode == "Direct LLM":
-                    result = run_direct(st.session_state.document_text, question)
-                elif mode == "RAG":
-                    result = run_rag(st.session_state.file_path, question)
-                elif mode == "Hybrid":
-                    result = run_hybrid(st.session_state.file_path, st.session_state.document_text, question)
+                print(f"[CHAT] Processing question with Hybrid mode", file=sys.stderr)
+                print(f"[CHAT] uploaded_name: {st.session_state.get('uploaded_name')}", file=sys.stderr)
+                
+                # Always use Hybrid mode (tries RAG, falls back to Direct LLM if needed)
+                print(f"[CHAT] Running Hybrid mode", file=sys.stderr)
+                result = run_hybrid(st.session_state.file_path, st.session_state.document_text, question)
+                
+                print(f"[CHAT] Got result with keys: {list(result.keys())}", file=sys.stderr)
+                print(f"[CHAT] Result raw_answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
                 
                 # Log to history
+                print(f"[CHAT] Calling log_to_history...", file=sys.stderr)
                 log_to_history(mode, question, result, st.session_state.get("uploaded_name", "unknown"))
+                print(f"[CHAT] log_to_history completed", file=sys.stderr)
                 
                 # Add to chat display (will show on next render)
                 st.success(f"✅ {mode} completed!")

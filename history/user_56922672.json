@@ -1,0 +1,36 @@
+[
+  {
+    "timestamp": "2026-08-20T09:52:24.133415",
+    "question": "care sunt top 3 maxime amuzante?",
+    "answer": "**Top 3 maxime amuzante din listă:**\n\n1. **„Lumea este plină de cactuși, dar asta nu înseamnă că trebuie să ne așezăm pe ei.”** – Will Foley  \n   (Imaginea e comică și practică.)\n\n2. **„Unii oameni bombănesc mereu pentru că trandafirii au spini; eu sunt recunoscător că spinii au trandafiri.”** – Alphonse Karr  \n   (Răsturnare de perspectivă ingenioasă.)\n\n3. **„Dacă tot a luat foc casa, cel puțin să ne încălzim.”** – Proverb italian  \n   (Umor negru și resemnare amuzantă.)",
+    "mode": "Direct LLM",
+    "document_name": "Maxime.pdf",
+    "metrics": {
+      "total_seconds": 6.021282300003804,
+      "retrieval_seconds": 0.0,
+      "generation_seconds": 6.021282300003804,
+      "chunk_count": 0,
+      "prompt_tokens": 1466,
+      "completion_tokens": 155,
+      "total_tokens": 2071,
+      "temperature": 0.2
+    }
+  },
+  {
+    "timestamp": "2026-08-20T09:52:54.438865",
+    "question": "care sunt top 3 cele mai serioase?",
+    "answer": "**Top 3 cele mai serioase (profunde):**\n\n1. **Swami Vivekananda** – „Daca te gandesti la un dezastru, il vei avea... Gandeste pozitiv si stapanitor, cu incredere si credinta...”\n2. **Epictet** – „Oamenii nu sunt deranjati de catre lucruri, ci de parerea lor despre ele.”\n3. **Dale Carnegie** – „Cele mai importante lucruri în lume au fost realizate de oameni care au continuat să încerce chiar şi când se părea că nu mai este nicio speranţă.”",
+    "mode": "Direct LLM",
+    "document_name": "Maxime.pdf",
+    "metrics": {
+      "total_seconds": 7.028495300008217,
+      "retrieval_seconds": 0.0,
+      "generation_seconds": 7.028495300008217,
+      "chunk_count": 0,
+      "prompt_tokens": 1466,
+      "completion_tokens": 131,
+      "total_tokens": 2248,
+      "temperature": 0.2
+    }
+  }
+]

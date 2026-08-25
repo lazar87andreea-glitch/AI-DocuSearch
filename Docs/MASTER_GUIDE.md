@@ -14,18 +14,23 @@ The project is built around a simple but effective architecture:
 
 ## Core principles
 
-### 1. Retrieval first
-The intended design is to retrieve the most relevant sections of a document before answering. This reduces hallucination and keeps answers anchored to the actual content of the document.
+### 1. Intelligent Retrieval with Automatic Fallback (Hybrid Mode)
+The app intelligently attempts retrieval-augmented generation (RAG) with full embeddings first.
+If that fails (low memory, model unavailable), it seamlessly falls back to direct LLM processing.
+This ensures best-quality answers with reliable fallback behavior.
 
-### 2. LLM as answer generator
-The LLM is used to synthesize a response from the retrieved content. It should not be the only source of information when the document context is available.
+### 2. Retrieval first, fallback second
+When resources permit, retrieve the most relevant sections of a document before answering. 
+This reduces hallucination and keeps answers anchored to the actual content.
+If retrieval isn't available, fall back to the full document text.
 
 ### 3. Stability over complexity
-For low-memory or low-resource environments, the system includes a lightweight fallback mode so the app remains usable without crashing or downloading heavy models.
+For low-memory or low-resource environments, the system gracefully adapts to ensure usability.
+No crashes, no frozen UI, no failed downloads — just reliable answers.
 
 ## Current Status & Feature Completion
 
-**Overall:** ✅ ~85% Complete — Core RAG pipeline production-ready; observability and UI polish ongoing
+**Overall:** ✅ ~90% Complete — Core RAG pipeline production-ready; observability, feedback collection, and UI polish complete
 
 | Step | Module | Status | Notes |
 |------|--------|--------|-------|
@@ -36,7 +41,8 @@ For low-memory or low-resource environments, the system includes a lightweight f
 | **Step 5** | Pipeline | ✅ Complete | End-to-end orchestration, lite mode fallback |
 | **Step 6** | History Tracking | ✅ 95% | Hybrid storage (in-memory + disk) working; sidebar UI deferred |
 | **Step 7** | Cloud Deployment | ⚠️ 80% | Deploys; secrets loading partially hardened; needs testing |
-| **UI Chat** | Streamlit App | ✅ Complete | Chat bubbles, mode selector, responsive mobile |
+| **Step 8** | Feedback Collection | ✅ Complete | Thumbs up/down ratings, detailed feedback, per-session isolation |
+| **UI Chat** | Streamlit App | ✅ Complete | Hybrid mode only, chat bubbles, responsive mobile |
 | **UI Metrics** | Display | ⚠️ Removed | User preference; metrics no longer shown in default view |
 
 ---
@@ -48,6 +54,7 @@ For low-memory or low-resource environments, the system includes a lightweight f
 - 💬 **Conversational UI:** Chat interface with left/right bubbles, timestamps, mode badges
 - 💾 **Persistent history:** Dual-layer storage (session cache + disk JSON per user)
 - 📊 **LangSmith tracing:** Manual Client-based tracing for debugging
+- 📋 **User feedback collection:** Thumbs up/down ratings + detailed feedback + analytics export
 - 🌍 **Responsive design:** Desktop + mobile optimized
 - 🛡️ **Stability:** Graceful fallbacks for memory/model/API failures
 
@@ -79,9 +86,13 @@ AI DocuSearch/
 ├── web_app.py                         # Streamlit web application
 ├── test_ingest.py                     # Document ingestion tests
 ├── test_langsmith.py                  # LangSmith configuration verification
+├── test_feedback.py                   # Feedback collection tests
+├── export_feedback.py                 # Feedback analytics & export tool
 ├── src/
 │   ├── ai_query.py
 │   ├── embed_index.py
+│   ├── feedback_manager.py            # User feedback collection (NEW)
+│   ├── history_manager.py
 │   ├── ingest.py
 │   ├── pipeline.py
 │   ├── preprocess.py
@@ -97,7 +108,8 @@ AI DocuSearch/
 │   ├── STEP_4_AI_QUERY.md
 │   ├── STEP_5_PIPELINE.md
 │   ├── STEP_6_HISTORY_TRACKING.md
-│   └── STEP_7_STREAMLIT_CLOUD_DEPLOYMENT.md
+│   ├── STEP_7_STREAMLIT_CLOUD_DEPLOYMENT.md
+│   └── STEP_8_FEEDBACK_COLLECTION.md  # User feedback system (NEW)
 ├── examples/
 │   └── sample.txt
 └── ...

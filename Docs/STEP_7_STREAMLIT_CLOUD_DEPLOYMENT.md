@@ -124,10 +124,12 @@ HISTORY_LIMIT = "10"
    - Wait for extraction (green ✅ message)
 
 2. **Chat with the document**
-   - Select a mode: **Direct LLM** (fastest, all devices), **RAG** (most accurate, desktop only), or **Hybrid** (tries RAG, falls back to Direct LLM)
+   - The app uses **Hybrid Mode** automatically — it intelligently tries RAG (retrieval-augmented generation)
+     and falls back to direct LLM if embeddings/retrieval is unavailable
    - Type your question in the chat input box
    - Press Enter or click the input box to submit
    - Answer appears in the conversation thread below
+   - Works seamlessly on desktop, tablet, and mobile devices
 
 3. **View conversation history**
    - Previous questions and answers appear in the chat area
