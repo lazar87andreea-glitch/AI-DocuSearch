@@ -244,13 +244,40 @@ def run_direct(document_text: str, question: str, document_info: str = "Unknown"
     }
 
 
+def _is_rag_inconclusive(answer: str) -> bool:
+    """Check if RAG returned an 'I don't know' or similar inconclusive answer."""
+    answer_lower = answer.lower().strip()
+    inconclusive_patterns = [
+        "does not provide",
+        "does not contain",
+        "not found in",
+        "cannot find",
+        "i don't know",
+        "i do not know",
+        "unclear",
+        "not specified",
+        "not mentioned",
+    ]
+    return any(pattern in answer_lower for pattern in inconclusive_patterns)
+
+
 @traceable(run_type="chain", name="web_app.hybrid_mode")
 def run_hybrid(file_path: str, document_text: str, question: str, document_info: str = "Unknown") -> dict:
     print(f"[HYBRID] Starting Hybrid mode for question: {question[:50]}...", file=sys.stderr)
     try:
         print(f"[HYBRID] Attempting RAG pipeline...", file=sys.stderr)
         result = run_rag(file_path, question, document_info=document_info)
-        print(f"[HYBRID] RAG succeeded, answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
+        answer_text = result.get('raw_answer', '')
+        print(f"[HYBRID] RAG succeeded, answer length: {len(answer_text)} chars", file=sys.stderr)
+        
+        # Check if RAG returned an inconclusive answer
+        if _is_rag_inconclusive(answer_text):
+            print(f"[HYBRID] RAG returned inconclusive answer. Trying Direct LLM for better results...", file=sys.stderr)
+            fallback_result = run_direct(document_text, question, document_info=document_info)
+            fallback_result["fallback_reason"] = "RAG found insufficient information in document"
+            print(f"[HYBRID] Direct LLM fallback succeeded, answer length: {len(fallback_result.get('raw_answer', ''))} chars", file=sys.stderr)
+            return fallback_result
+        
         return result
     except Exception as e:
         print(f"[HYBRID] RAG failed: {type(e).__name__}: {e}", file=sys.stderr)
