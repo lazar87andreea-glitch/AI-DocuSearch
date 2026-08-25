@@ -251,6 +251,7 @@ def _is_rag_inconclusive(answer: str) -> bool:
     """Check if RAG returned an 'I don't know' or similar inconclusive answer."""
     answer_lower = answer.lower().strip()
     inconclusive_patterns = [
+        # English patterns
         "does not provide",
         "does not contain",
         "not found in",
@@ -260,6 +261,34 @@ def _is_rag_inconclusive(answer: str) -> bool:
         "unclear",
         "not specified",
         "not mentioned",
+        # Romanian patterns
+        "nu furnizeaza",
+        "nu oferă",
+        "nu contine",
+        "nu am gasit",
+        "nu este mentionat",
+        "nu se specifica",
+        # French patterns
+        "ne fournit pas",
+        "ne contient pas",
+        "non trouvé",
+        "n'a pas trouvé",
+        "ne contient aucune",
+        "pas spécifié",
+        # Spanish patterns
+        "no proporciona",
+        "no contiene",
+        "no encontrado",
+        "no encontré",
+        "no se especifica",
+        "no menciona",
+        # German patterns
+        "liefert nicht",
+        "enthält nicht",
+        "nicht gefunden",
+        "nicht gefunden",
+        "nicht angegeben",
+        "nicht erwähnt",
     ]
     return any(pattern in answer_lower for pattern in inconclusive_patterns)
 
@@ -507,15 +536,15 @@ def render_chat_history() -> None:
             justify-content: flex-end;
         }
         .chat-avatar {
-            width: 44px;
-            height: 44px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
             color: white;
-            font-size: 24px;
+            font-size: 12px;
             flex-shrink: 0;
             line-height: 1;
         }
@@ -568,7 +597,16 @@ def render_chat_history() -> None:
     
     # Display each conversation turn
     for entry in reversed(recent):
-        timestamp = entry.get("timestamp", "")[:16]
+        # Format timestamp to HH:MM instead of ISO format (2026-08-25T14:36 -> 14:36)
+        try:
+            iso_timestamp = entry.get("timestamp", "")
+            if "T" in iso_timestamp:
+                time_part = iso_timestamp.split("T")[1][:5]  # Extract HH:MM from ISO format
+            else:
+                time_part = iso_timestamp[:16]
+        except:
+            time_part = entry.get("timestamp", "")[:16]
+        
         mode = entry.get("mode", "")
         question = entry.get("question", "")
         answer = entry.get("answer", "")
@@ -579,7 +617,7 @@ def render_chat_history() -> None:
             <div class="chat-avatar user">YOU</div>
             <div>
                 <div class="chat-bubble user">{question}</div>
-                <div class="chat-info user">{timestamp}</div>
+                <div class="chat-info user">{time_part}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -591,7 +629,7 @@ def render_chat_history() -> None:
                 <div class="chat-bubble bot">{answer}</div>
                 <div class="chat-info bot">{mode}</div>
             </div>
-            <div class="chat-avatar bot">🤖</div>
+            <div class="chat-avatar bot">BOT</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -774,7 +812,7 @@ if st.session_state.document_text:
     st.markdown("---")
     
     # Chat input
-    question = st.chat_input(translate("ask_question"), key="chat_input")
+    question = st.chat_input(translate("ask_question") + " 📝", key="chat_input")
     
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -814,8 +852,11 @@ if st.session_state.document_text:
                 log_to_history(mode, question, result, st.session_state.get("uploaded_name", "unknown"))
                 print(f"[CHAT] log_to_history completed", file=sys.stderr)
                 
-                # Add to chat display (will show on next render)
-                st.success(f"{translate('completed')} {mode} completed!")
+                # Display result with feedback buttons
+                print(f"[CHAT] Displaying result with render_result...", file=sys.stderr)
+                render_result("hybrid", result)
+                
+                # Rerun to update chat history display
                 st.rerun()
                 
             except Exception as e:

@@ -1,4 +1,4 @@
-# temperature: 0.2
+# temperature: 0.4
 
 You are an AI assistant. Provide helpful and accurate answers using your general knowledge.
 

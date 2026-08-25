@@ -1,0 +1,36 @@
+[
+  {
+    "timestamp": "2026-08-25T17:53:32.136708",
+    "question": "ce poti sa imi spui despre istoria natiunii?",
+    "answer": "Documentul furnizat (extras din „INUAKI - Reptilianul Din Mine, Cartea a II-a”) nu conține nicio informație despre istoria unei națiuni. Discuția se concentrează pe teme spirituale: karma, influența Anunnaki asupra mecanismelor umane, necesitatea de a verifica personal adevărul înainte de a-l transmite altora, pregătiri practice pentru schimbări pe Pământ și rolul de exemplu personal. Nu se face referire la istorie națională, popoare sau evenimente istorice.",
+    "mode": "Hybrid",
+    "document_name": "1_INUAKI-Reptilianul-Din-Mine-Cartea-a-II-a.pdf",
+    "metrics": {
+      "total_seconds": 134.97484629998507,
+      "retrieval_seconds": 0.012646299997868482,
+      "generation_seconds": 5.014261499993154,
+      "chunk_count": 3,
+      "prompt_tokens": 826,
+      "completion_tokens": 113,
+      "total_tokens": 1320,
+      "temperature": 0.4
+    }
+  },
+  {
+    "timestamp": "2026-08-25T17:56:39.509134",
+    "question": "despre ce subiecte te pot intreba, efectueaza un rezumat.",
+    "answer": "**Rezumatul subiectelor din document:**\n\nDocumentul (extras din „Inuaki – Reptilianul din mine”, Cartea a II-a) abordează următoarele teme principale:\n\n- **Trezire colectivă și lumină vs. întuneric**: Ideea că lumina anulează frica și întunericul, iar oamenii trebuie să înceteze să se teamă pentru a ieși din „realitatea prizonieră”. Informațiile odată auzite rămân în conștiință și pot fi activate mai târziu.\n- **Entități de lumină pe Pământ**: Prezența multor ființe de lumină venite special pentru a pregăti omenirea.\n- **Orașe subterane și biblioteci ascunse**: Descrieri ale unor intrări cu pante abrupte care duc la biblioteci și orașe subterane, accesibile doar după un anumit traseu.\n- **Legătura cu Atlantida**: Un personaj care conduce lucrările este un „suflet vechi”, fost atlant, care simte legătura cu evenimentele din Atlantida și se teme că descoperirea ar putea schimba istoria sau duce la distrugere.\n- **David și cartea „Inuaki, reptilianul din mine”**: David este prezentat ca fiind cunoscut pentru puritatea sufletului și acuratețea mesajelor sale. Feedback-ul cititorilor este predominant pozitiv, deși subiectul inițial părea controversat.\n\n**Subiecte despre care poți întreba:**\n- Trezirea spirituală și rolul fricii\n- Entități de lumină și pregătirea omenirii\n- Orașe subterane, biblioteci ascunse și accesul la ele\n- Legătura cu Atlantida și sufletele vechi\n- Cartea Inuaki, mesajele lui David și reacțiile cititorilor\n- Aspecte generale despre reptilieni și experiențele din carte\n\nPoți formula întrebări pe oricare dintre aceste teme, iar eu voi răspunde strict pe baza textului furnizat.",
+    "mode": "Hybrid",
+    "document_name": "1_INUAKI-Reptilianul-Din-Mine-Cartea-a-II-a.pdf",
+    "metrics": {
+      "total_seconds": 83.02719119999529,
+      "retrieval_seconds": 0.01072310000017751,
+      "generation_seconds": 9.86565949999931,
+      "chunk_count": 3,
+      "prompt_tokens": 824,
+      "completion_tokens": 437,
+      "total_tokens": 1781,
+      "temperature": 0.4
+    }
+  }
+]
