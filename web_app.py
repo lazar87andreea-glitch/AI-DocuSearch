@@ -99,6 +99,7 @@ from src.ai_query import generate_answer_with_meta
 from src.pipeline import build_pipeline, answer_question
 from src.prompt_loader import load_prompt_with_temperature
 from src.i18n import translate, get_user_language
+from src.gdpr_compliance import show_consent_banner, show_gdpr_sidebar, show_third_party_disclosure
 
 # Initialize LangSmith client for manual tracing
 try:
@@ -149,6 +150,7 @@ st.set_page_config(page_title="AI DocuSearch", layout="wide")
 # Initialize history manager for this session
 if "history_manager" not in st.session_state:
     session_id = str(hash((st.session_state.session_id if hasattr(st.session_state, 'session_id') else id(st.session_state))) % (10 ** 8))
+    st.session_state.session_id = session_id  # Store for GDPR access
     st.session_state.history_manager = HistoryManager(session_id)
 
 # Run cleanup on every app load (targets old sessions, doesn't affect current one)
@@ -162,6 +164,10 @@ if history_enabled:
 
 # Check if on mobile
 is_mobile = is_mobile_browser()
+
+# Show GDPR consent banner (must be accepted to continue)
+if not show_consent_banner():
+    st.stop()
 
 if is_mobile:
     st.info(
@@ -351,10 +357,16 @@ def log_to_history(mode: str, question: str, result: dict, document_name: str) -
 
 
 def render_history_sidebar() -> None:
-    """Display recent questions for current document in sidebar (hidden - background tracking only)."""
-    # History is tracked but not displayed in sidebar anymore
-    # Users interact via chat interface instead
-    pass
+    """Display GDPR compliance options and history tracking."""
+    # Show GDPR data management options
+    show_gdpr_sidebar(
+        session_id=str(st.session_state.get("session_id", "unknown")),
+        history_manager=st.session_state.get("history_manager"),
+        feedback_manager=None
+    )
+    
+    # Show third-party service disclosures
+    show_third_party_disclosure()
 
 
 def render_chat_history() -> None:
