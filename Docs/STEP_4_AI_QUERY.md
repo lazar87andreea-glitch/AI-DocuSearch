@@ -178,18 +178,12 @@ run = None
 run_ended = False
 
 if api_key and base_url and resolved_model:
-    # Debug: Log LangSmith environment BEFORE creating client
-    print(f"[LANGSMITH_ENV] API_KEY present: {bool(os.getenv('LANGSMITH_API_KEY'))}", file=sys.stderr)
-    print(f"[LANGSMITH_ENV] TRACING: '{os.getenv('LANGSMITH_TRACING')}'", file=sys.stderr)
-    print(f"[LANGSMITH_ENV] PROJECT: '{os.getenv('LANGSMITH_PROJECT')}'", file=sys.stderr)
-    
     # Initialize LangSmith client
     try:
         from langsmith import Client
         _ls_client = Client()
-        print(f"[LANGSMITH] Client initialized successfully", file=sys.stderr)
     except Exception as e:
-        print(f"[LANGSMITH] Failed to initialize client: {type(e).__name__}: {e}", file=sys.stderr)
+        _ls_client = None
 ```
 
 **Create Run (before API call):**
