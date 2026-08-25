@@ -841,9 +841,6 @@ if "chat_messages" not in st.session_state:
 
 # If document is uploaded, show chat interface
 if st.session_state.document_text:
-    # Chat container
-    st.markdown("<div style='background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; @media (prefers-color-scheme: dark) { background-color: #1e1e1e; border-color: #333; }'>" , unsafe_allow_html=True)
-    
     # Hybrid mode is the only mode
     mode = "Hybrid"
     
@@ -856,8 +853,6 @@ if st.session_state.document_text:
     
     # Chat input
     question = st.chat_input(translate("ask_question") + " 📝", key="chat_input")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
     
     if question:
         # Store question for feedback

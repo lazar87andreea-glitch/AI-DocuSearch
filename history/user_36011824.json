@@ -1,0 +1,19 @@
+[
+  {
+    "timestamp": "2026-08-25T18:14:42.456770",
+    "question": "despre ce este vorba in document?",
+    "answer": "Documentul este un fragment din cartea „Inuaki – Reptilianul din mine”, Cartea a II-a (PDF cu 60 de pagini). \n\nEste vorba despre un dialog (între A și D) pe teme spirituale și esoterice: tranziția spre o „nouă lume” în care oamenii învață să „redevină oameni”, rolul Matricei, schimbările geografice/calamitățile ca urmare a refuzului oamenilor de a se schimba, programarea mentală, importanța de a cere ajutor Universului, responsabilitatea personală și reîncarnarea (ideea că deciziile de azi ne vor afecta peste zeci/sute de ani când ne vom întoarce pe Pământ). \n\nTextul subliniază că înțelegerea acestor adevăruri ar accelera evoluția și ar reduce evenimentele negative viitoare.",
+    "mode": "Hybrid",
+    "document_name": "1_INUAKI-Reptilianul-Din-Mine-Cartea-a-II-a.pdf",
+    "metrics": {
+      "total_seconds": 123.5602801999994,
+      "retrieval_seconds": 0.051961600001959596,
+      "generation_seconds": 8.519815299994661,
+      "chunk_count": 3,
+      "prompt_tokens": 822,
+      "completion_tokens": 187,
+      "total_tokens": 1492,
+      "temperature": 0.4
+    }
+  }
+]
