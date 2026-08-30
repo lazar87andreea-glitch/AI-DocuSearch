@@ -75,7 +75,7 @@ presented as production-ready; see the known limitations and legal documents bef
 - 🗣️ **Language-aware responses:** LLM responds in the user's question language
 - 💰 **Cost tracking & budgeting:** Real-time LLM usage monitoring with Grok pricing, visual badge, budget warnings and blocking
 - � **Semantic fallback:** Automatic Direct LLM invocation when RAG can't answer document-based questions
-- �🔐 **GDPR compliance:** Consent banner, user data export/deletion, privacy policy, terms of service, footer links
+- �🔐 **GDPR compliance:** Consent banner, user data export/deletion, privacy policy, terms of service, third-party service disclosure, footer links
 - 🌐 **Responsive design:** Desktop + mobile optimized
 - 🛡️ **Stability:** Graceful fallbacks for memory/model/API failures
 
@@ -105,10 +105,12 @@ AI DocuSearch/
 ├── packages.txt                       # System dependencies (Streamlit Cloud)
 ├── demo.py                            # CLI demo script
 ├── web_app.py                         # Streamlit navigation entry point
+├── THIRD_PARTY_SERVICES.md            # External-provider disclosure
 ├── app_pages/
 │   ├── home.py                        # Main document Q&A application
 │   ├── privacy_policy.py              # In-app Privacy Policy
-│   └── terms_of_service.py            # In-app Terms of Service
+│   ├── terms_of_service.py            # In-app Terms of Service
+│   └── third_party_services.py        # In-app provider disclosure
 ├── test_ingest.py                     # Document ingestion tests
 ├── test_langsmith.py                  # LangSmith configuration verification
 ├── test_feedback.py                   # Feedback collection tests

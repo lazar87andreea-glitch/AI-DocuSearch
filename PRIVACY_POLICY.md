@@ -103,6 +103,9 @@ You can download all your personal data at any time:
 ### 6.3 IP Geolocation (ip-api.com)
 - **Purpose**: Detect your country for language localization
 - **Data Shared**: Your IP address only
+- **Provider**: ip-api.com
+- **Privacy Policy**: https://ip-api.com/privacy
+- **Fallback**: Browser Accept-Language header (no IP needed if available)
 
 ### 6.4 Google Forms (Testing Feedback)
 - **Purpose**: Collect optional feedback about the AI DocuSearch testing experience
@@ -111,15 +114,15 @@ You can download all your personal data at any time:
 - **Privacy Policy**: https://policies.google.com/privacy
 - **Control**: Opening and submitting the form is optional. Do not include uploaded document content, confidential information, or other personal data in free-text responses.
 - **Deletion**: The Application's "Delete Data" control cannot delete Google Forms responses. Contact the Application operator regarding a submitted response.
-- **Provider**: ip-api.com
-- **Privacy Policy**: https://ip-api.com/privacy
-- **Fallback**: Browser Accept-Language header (no IP needed if available)
 
-### 6.4 No Other Sharing
+### 6.5 No Other Sharing
 - ❌ We do NOT sell your data
 - ❌ We do NOT share with marketing companies
 - ❌ We do NOT use your data for advertising
 - ❌ We do NOT share with social media platforms
+
+See the in-app **Third-Party Services** page for a consolidated explanation of provider data,
+controls, and links to provider privacy information.
 
 ---
 

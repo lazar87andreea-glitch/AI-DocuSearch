@@ -21,6 +21,11 @@ page = st.navigation(
             title="Terms of Service",
             icon=":material/description:",
         ),
+        st.Page(
+            "app_pages/third_party_services.py",
+            title="Third-Party Services",
+            icon=":material/handshake:",
+        ),
     ],
     position="hidden",
 )

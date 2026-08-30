@@ -11,7 +11,7 @@ with GDPR, CCPA, or any other law.
 - Provide users with data export (right to portability)
 - Enable users to delete locally associated history, feedback, and selected in-memory document state
 - Transparently disclose third-party data sharing
-- Host Privacy Policy and Terms of Service
+- Host Privacy Policy, Terms of Service, and Third-Party Services pages
 
 **Status:** Implemented for experimental use; legal and security review is still required before production use.
 
@@ -36,10 +36,12 @@ with GDPR, CCPA, or any other law.
 | `export_user_data(session_id, ...)` | Export all user data as JSON | dict |
 | `delete_user_data(session_id, ...)` | Permanently delete user's data | bool (success) |
 | `show_gdpr_footer(session_id, ...)` | Display footer with data management links | None |
-| `show_third_party_disclosure()` | List third-party services receiving data | None |
 | `get_consent_key()` | Get session state key for consent tracking | str |
 
 ### Legal Documents
+
+The application renders `PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`, and
+`THIRD_PARTY_SERVICES.md` as linked in-app pages registered by `web_app.py`.
 
 **PRIVACY_POLICY.md** (8,200+ lines)
 - Comprehensive GDPR/CCPA compliance documentation

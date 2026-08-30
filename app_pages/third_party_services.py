@@ -14,9 +14,9 @@ with navigation:
         icon=":material/policy:",
     )
     st.page_link(
-        "app_pages/third_party_services.py",
-        label="Third-Party Services",
-        icon=":material/handshake:",
+        "app_pages/terms_of_service.py",
+        label="Terms of Service",
+        icon=":material/description:",
     )
 
-st.markdown((ROOT_DIR / "TERMS_OF_SERVICE.md").read_text(encoding="utf-8"))
+st.markdown((ROOT_DIR / "THIRD_PARTY_SERVICES.md").read_text(encoding="utf-8"))

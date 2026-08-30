@@ -65,10 +65,12 @@ AI DocuSearch/
 ├── packages.txt                    # System dependencies for Streamlit Cloud
 ├── demo.py
 ├── web_app.py                       # Streamlit navigation entry point
+├── THIRD_PARTY_SERVICES.md          # External-provider disclosure
 ├── app_pages/
 │   ├── home.py                      # Main document Q&A experience
 │   ├── privacy_policy.py            # In-app Privacy Policy page
-│   └── terms_of_service.py          # In-app Terms of Service page
+│   ├── terms_of_service.py          # In-app Terms of Service page
+│   └── third_party_services.py      # In-app provider disclosure page
 ├── test_ingest.py
 ├── test_legal_pages.py              # Legal page navigation verification
 ├── test_langsmith.py               # LangSmith configuration verification

@@ -266,7 +266,11 @@ def show_gdpr_footer(session_id: str, history_manager, feedback_manager=None):
         )
     
     with col5:
-        st.markdown("[🔗 Third Parties](#)")
+        st.page_link(
+            "app_pages/third_party_services.py",
+            label="Third-Party Services",
+            icon=":material/handshake:",
+        )
     
     st.markdown("""
     **Your GDPR Rights:**
@@ -277,50 +281,11 @@ def show_gdpr_footer(session_id: str, history_manager, feedback_manager=None):
     - ✅ Object to tracking
     """)
 
-
-def show_third_party_disclosure():
-    """
-    Show disclosure about third-party data sharing.
-    """
-    with st.expander("🔗 Third-Party Services"):
-        st.markdown("""
-        **Your data may be shared with:**
-        
-        🤖 **LLM Providers** (Process your questions)
-        - OpenAI, xAI, Groq, or other configured providers
-        - Your questions are sent to their servers
-        - Check their privacy policies
-        
-        🔍 **LangSmith** (Debug & Monitor)
-        - Traces your AI interactions for debugging
-        - May attach your Helpful/Not helpful rating to the answer trace
-        - Detects and logs to https://smith.langchain.com
-        - Can be disabled: `LANGSMITH_TRACING=false`
-        
-        🌐 **Geolocation** (Detect Language)
-        - ip-api.com reads your IP for country detection
-        - Used only for language selection
-        - No personal data required
-
-        📝 **Google Forms** (Optional Testing Feedback)
-        - Opens only when you select "Share feedback"
-        - Receives the answers you choose to submit and data covered by Google's privacy policy
-        - Do not include document content or confidential information
-        
-        ✅ **We do NOT:**
-        - Sell your data
-        - Share with advertisers
-        - Train models on your documents
-        - Use for marketing purposes
-        """)
-
-
 __all__ = [
     "show_consent_banner",
     "export_user_data",
     "delete_user_data",
     "show_gdpr_footer",
     "show_gdpr_sidebar",
-    "show_third_party_disclosure",
     "get_consent_key",
 ]

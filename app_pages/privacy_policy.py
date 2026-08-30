@@ -13,5 +13,10 @@ with navigation:
         label="Terms of Service",
         icon=":material/description:",
     )
+    st.page_link(
+        "app_pages/third_party_services.py",
+        label="Third-Party Services",
+        icon=":material/handshake:",
+    )
 
 st.markdown((ROOT_DIR / "PRIVACY_POLICY.md").read_text(encoding="utf-8"))

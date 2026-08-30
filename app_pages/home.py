@@ -100,7 +100,7 @@ from src.pipeline import build_pipeline_from_text, answer_question
 from src.upload_storage import cleanup_stale_uploads, temporary_upload
 from src.prompt_loader import load_prompt_with_temperature
 from src.i18n import translate, get_user_language
-from src.gdpr_compliance import show_consent_banner, show_gdpr_footer, show_third_party_disclosure
+from src.gdpr_compliance import show_consent_banner, show_gdpr_footer
 from src.cost_tracker import initialize_cost_tracker, get_cost_badge, should_warn, is_blocked, track_query_cost
 from src.feedback_manager import FeedbackManager
 from src.langsmith_feedback import submit_langsmith_feedback
