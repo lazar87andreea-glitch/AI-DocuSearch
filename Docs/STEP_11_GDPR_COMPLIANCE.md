@@ -406,7 +406,7 @@ user_export["data"]["cost_tracking"] = {
 2. At any time, user can click "Download Data" (footer)
 3. Browser downloads JSON file with all history
 4. Or user can click "Delete Data" to wipe everything
-5. Links to Privacy Policy and Terms open in new windows
+5. Links to Privacy Policy and Terms open dedicated pages inside the Streamlit application
 ```
 
 ### On Deletion

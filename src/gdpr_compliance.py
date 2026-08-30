@@ -44,8 +44,20 @@ def show_consent_banner() -> bool:
         - 🗑️ Delete your data anytime
         - ⏰ Auto-deletion after 30-90 days
         
-        📋 See [Privacy Policy](PRIVACY_POLICY.md) | [Terms of Service](TERMS_OF_SERVICE.md)
         """)
+
+        legal_links = st.container(horizontal=True)
+        with legal_links:
+            st.page_link(
+                "app_pages/privacy_policy.py",
+                label="Privacy Policy",
+                icon=":material/policy:",
+            )
+            st.page_link(
+                "app_pages/terms_of_service.py",
+                label="Terms of Service",
+                icon=":material/description:",
+            )
         
         col1, col2 = st.columns(2)
         with col1:
@@ -192,7 +204,7 @@ def show_gdpr_footer(session_id: str, history_manager, feedback_manager=None):
     """
     Display GDPR compliance links at the bottom of the page (footer).
     
-    Links open in new windows and include:
+    The footer includes in-app legal pages and controls for:
     - Download data (right to portability)
     - Delete data (right to erasure)
     - Privacy Policy
@@ -240,10 +252,18 @@ def show_gdpr_footer(session_id: str, history_manager, feedback_manager=None):
                     st.error("❌ Error deleting data")
     
     with col3:
-        st.markdown("[📜 Privacy Policy](PRIVACY_POLICY.md)")
+        st.page_link(
+            "app_pages/privacy_policy.py",
+            label="Privacy Policy",
+            icon=":material/policy:",
+        )
     
     with col4:
-        st.markdown("[📋 Terms of Service](TERMS_OF_SERVICE.md)")
+        st.page_link(
+            "app_pages/terms_of_service.py",
+            label="Terms of Service",
+            icon=":material/description:",
+        )
     
     with col5:
         st.markdown("[🔗 Third Parties](#)")

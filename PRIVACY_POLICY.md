@@ -245,4 +245,4 @@ We may update this Privacy Policy periodically. The "Last Updated" date above in
 
 **By using AI DocuSearch, you acknowledge that you have read and understood this Privacy Policy.**
 
-For more details, see our [Terms of Service](TERMS_OF_SERVICE.md).
+For more details, open the Terms of Service page in the Application.

@@ -43,7 +43,7 @@ The only deferred feature is the history sidebar UI (not implemented by design -
 ✅ **UI/UX Improvements** — No more sidebar panels:
 - Removed sidebar-based GDPR data management (show_gdpr_sidebar deprecated)
 - Added footer-based links for Privacy Policy and Terms of Service
-- Links open in new browser windows
+- Links open dedicated pages inside the Streamlit application
 - Consent banner remains at top, now with multilingual support
 - Cleaner, distraction-free interface
 
