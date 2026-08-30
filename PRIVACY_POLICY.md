@@ -72,7 +72,7 @@ We use collected information for:
 You can delete all your data at any time:
 - Use "🗑️ Delete Data" in the Privacy & Data Management footer
 - This removes the current session's locally stored questions, answers, feedback, and in-memory document state
-- Temporary uploaded-file copies have already been removed after extraction; this control does not guarantee deletion of data already processed or retained by configured LLM providers or LangSmith
+- Temporary uploaded-file copies have already been removed after extraction; this control does not guarantee deletion of data already processed or retained by configured LLM providers, LangSmith, or Google Forms
 - **This action is irreversible**
 
 ### 5.3 Data Portability
@@ -103,6 +103,14 @@ You can download all your personal data at any time:
 ### 6.3 IP Geolocation (ip-api.com)
 - **Purpose**: Detect your country for language localization
 - **Data Shared**: Your IP address only
+
+### 6.4 Google Forms (Testing Feedback)
+- **Purpose**: Collect optional feedback about the AI DocuSearch testing experience
+- **Data Shared**: Only the answers you choose to submit through the external form, plus technical data Google may collect under its own policies
+- **Provider**: Google LLC
+- **Privacy Policy**: https://policies.google.com/privacy
+- **Control**: Opening and submitting the form is optional. Do not include uploaded document content, confidential information, or other personal data in free-text responses.
+- **Deletion**: The Application's "Delete Data" control cannot delete Google Forms responses. Contact the Application operator regarding a submitted response.
 - **Provider**: ip-api.com
 - **Privacy Policy**: https://ip-api.com/privacy
 - **Fallback**: Browser Accept-Language header (no IP needed if available)

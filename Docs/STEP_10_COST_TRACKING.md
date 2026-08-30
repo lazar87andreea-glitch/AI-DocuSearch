@@ -84,12 +84,17 @@ with col2:
 **Warning/Blocking Logic:**
 ```python
 if should_warn() and not is_blocked():
-    st.warning("⚠️ Budget Warning: 80% of free $0.50 budget used...")
+    st.warning("Free testing trial nearly complete: You are approaching the trial limit...")
 
 if is_blocked():
-    st.error("🛑 Budget Limit Reached: Please start a new session")
+    st.error("Free testing trial complete: Your free testing trial has ended...")
+    st.link_button("Share feedback", FEEDBACK_FORM_URL)
     st.stop()
 ```
+
+The same Google Forms link is shown beside the usage indicator before the limit is reached. It
+opens in a new tab, so users may provide feedback at any point without interrupting their session.
+Google Forms responses are not written to the app's local `FeedbackManager` storage.
 
 **Cost Tracking on Query:**
 ```python
@@ -216,11 +221,11 @@ Cost tracker detects: 100% budget exceeded
     ↓
 Cost badge turns red: 🛑 Cost: 102%
     ↓
-Red error banner: "🛑 Budget Limit Reached: Start a new session"
+Trial-complete message and Google Forms link appear
     ↓
-app.stop() — no more questions allowed
+User can open the optional feedback form in a new tab
     ↓
-User must close/refresh browser tab for new session
+app.stop() — the chat input is not rendered and no more questions are allowed
 ```
 
 ---

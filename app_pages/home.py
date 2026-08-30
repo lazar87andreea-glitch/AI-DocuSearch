@@ -105,6 +105,11 @@ from src.cost_tracker import initialize_cost_tracker, get_cost_badge, should_war
 from src.feedback_manager import FeedbackManager
 from src.langsmith_feedback import submit_langsmith_feedback
 
+FEEDBACK_FORM_URL = (
+    "https://docs.google.com/forms/d/e/"
+    "1FAIpQLSdljvKnBNz8j2y5tMlYPeLgyBa1alR28FRCt393QvFOaoAFuw/viewform"
+)
+
 # Initialize LangSmith client for manual tracing
 try:
     from langsmith import Client
@@ -189,17 +194,40 @@ st.markdown(translate("description"))
 
 # Display budget info and cost badge
 st.info(translate("budget_info"))
+budget_blocked = is_blocked()
 col1, col2 = st.columns([3, 1])
+with col1:
+    if not budget_blocked:
+        st.link_button(
+            "Share feedback",
+            FEEDBACK_FORM_URL,
+            icon=":material/rate_review:",
+            help="Open the AI DocuSearch testing feedback form in a new tab.",
+        )
 with col2:
     st.markdown(get_cost_badge())
 
 # Show warning if approaching budget limit
-if should_warn() and not is_blocked():
-    st.warning("⚠️ **Budget Warning**: You're using 80% of your free $0.50 budget. Next questions may not be answered.")
+if should_warn() and not budget_blocked:
+    st.warning(
+        "**Free testing trial nearly complete:** You are approaching the trial limit. "
+        "Only a small amount of usage remains."
+    )
 
 # Show blocking message if budget exceeded
-if is_blocked():
-    st.error("🛑 **Budget Limit Reached**: You've used your $0.50 free budget. Please start a new session or upgrade your plan.")
+if budget_blocked:
+    st.error(
+        "**Free testing trial complete:** Your free testing trial has ended. "
+        "Please share your experience using the form below. Your feedback will help improve "
+        "AI DocuSearch and is greatly appreciated."
+    )
+    st.link_button(
+        "Share feedback",
+        FEEDBACK_FORM_URL,
+        type="primary",
+        icon=":material/rate_review:",
+        help="Open the AI DocuSearch testing feedback form in a new tab.",
+    )
     st.stop()
 
 

@@ -141,10 +141,36 @@ def test_streamlit_provider_failure_is_not_saved() -> None:
         history_path.unlink(missing_ok=True)
 
 
+def test_streamlit_budget_limit_blocks_chat_input() -> None:
+    app = AppTest.from_file("web_app.py", default_timeout=30)
+    app.session_state["gdpr_consent_given"] = True
+    app.run()
+
+    feedback_links = app.get("link_button")
+    assert any(link.label == "Share feedback" for link in feedback_links)
+
+    app.session_state["llm_cost_tracker"] = {
+        "total_cost_usd": 0.50,
+        "queries_count": 1,
+        "queries": [],
+        "blocked": True,
+    }
+    app.run()
+
+    assert not app.exception
+    assert any("Free testing trial complete" in error.value for error in app.error)
+    feedback_links = app.get("link_button")
+    assert len(feedback_links) == 1
+    assert feedback_links[0].label == "Share feedback"
+    assert "docs.google.com/forms" in feedback_links[0].url
+    assert len(app.chat_input) == 0
+
+
 if __name__ == "__main__":
     test_live_response_is_marked_successful()
     test_provider_failure_is_not_returned_as_an_answer()
     test_missing_configuration_is_an_explicit_simulation()
     test_pipeline_propagates_provider_failure_state()
     test_streamlit_provider_failure_is_not_saved()
+    test_streamlit_budget_limit_blocks_chat_input()
     print("All AI query response-state tests passed.")

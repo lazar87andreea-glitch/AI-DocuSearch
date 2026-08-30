@@ -84,7 +84,7 @@ Always verify an answer against the original document. The Service does not prov
 
 ## 9. Third-Party Services and International Processing
 
-The Service may rely on a configured LLM provider, LangSmith for debugging and tracing, IP geolocation for attempted language selection, and hosting or infrastructure providers. Depending on the execution path, document excerpts or full extracted document text, questions, answers, and technical metadata may be transmitted to those providers.
+The Service may rely on a configured LLM provider, LangSmith for debugging and tracing, IP geolocation for attempted language selection, Google Forms for optional testing feedback, and hosting or infrastructure providers. Depending on the execution path, document excerpts or full extracted document text, questions, answers, and technical metadata may be transmitted to the relevant providers. Only information you enter into the external feedback form is intentionally submitted to Google Forms.
 
 Third-party services operate under their own terms, privacy policies, security measures, locations, and retention practices. The project operator cannot guarantee their availability or independently erase data they retain unless their tools and policies allow it. Processing may occur outside your country of residence.
 
@@ -94,6 +94,7 @@ See the Privacy Policy for the current processing and disclosure details. Do not
 
 - Chat history is intended to be retained locally for up to 30 days.
 - Feedback retention and automatic cleanup are still being tested; consult the Privacy Policy for the current status.
+- Optional Google Forms responses are held under Google's and the Application operator's retention controls and are not removed by the in-app "Delete Data" control.
 - The "Download Data" control in the Privacy & Data Management footer exports locally associated session data in JSON format.
 - The "Delete Data" control in that footer removes supported local records and in-memory document state for the current session; third-party copies remain subject to provider controls and retention policies.
 

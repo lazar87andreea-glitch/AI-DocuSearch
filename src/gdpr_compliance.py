@@ -301,6 +301,11 @@ def show_third_party_disclosure():
         - ip-api.com reads your IP for country detection
         - Used only for language selection
         - No personal data required
+
+        📝 **Google Forms** (Optional Testing Feedback)
+        - Opens only when you select "Share feedback"
+        - Receives the answers you choose to submit and data covered by Google's privacy policy
+        - Do not include document content or confidential information
         
         ✅ **We do NOT:**
         - Sell your data
