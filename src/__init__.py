@@ -1,0 +1,1 @@
+"""AI DocuSearch application package."""
