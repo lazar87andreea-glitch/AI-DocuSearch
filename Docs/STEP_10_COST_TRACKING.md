@@ -2,12 +2,14 @@
 
 ## Overview
 
-**Cost Tracking** is an automatic, user-facing system for monitoring LLM API usage in real-time and enforcing budget limits to prevent unexpected charges.
+**Cost Tracking** is a session-local estimate based on token usage and the fixed rates configured
+in `src/cost_tracker.py`. It enforces the app's internal usage limit; the provider dashboard is the
+authoritative source for actual billing.
 
 **Purpose:**
 - Provide transparent cost visibility to users
 - Prevent budget overruns on free tier ($0.50 USD per session)
-- Track actual Grok LLM consumption with precise pricing
+- Estimate usage with the project's fixed Grok-based pricing constants
 - Gracefully handle budget exhaustion without data loss
 
 **Status:** ✅ FULLY IMPLEMENTED (2026-08-25)
@@ -63,7 +65,7 @@ cost = (input_tokens / 1000 * 0.03) + (completion_tokens / 1000 * 0.10)
 
 ## Integration Points
 
-### 1. Web App (`web_app.py`)
+### 1. Home Page (`app_pages/home.py`)
 
 **Initialization:**
 ```python
@@ -93,11 +95,12 @@ if is_blocked():
 ```python
 result = run_hybrid(...)  # Get answer from LLM
 
-# Track the cost
-track_query_cost(
-    prompt_tokens=result.get("prompt_tokens", 0),
-    completion_tokens=result.get("completion_tokens", 0)
-)
+# Only successful provider responses are tracked.
+if result.get("response_status") == "success":
+    track_query_cost(
+        prompt_tokens=result.get("prompt_tokens", 0),
+        completion_tokens=result.get("completion_tokens", 0),
+    )
 ```
 
 ### 2. AI Query (`src/ai_query.py`)
@@ -108,7 +111,7 @@ The `generate_answer_with_meta()` function returns metadata including:
 - `completion_tokens`: Output token count
 - `total_tokens`: Sum of both
 
-This data is passed through the result dict to `web_app.py`.
+This data is passed through the result dict to `app_pages/home.py`.
 
 ### 3. GDPR Compliance (`src/gdpr_compliance.py`)
 
@@ -287,14 +290,14 @@ assert should_warn()  # 104% > 80%
 ## Limitations & Edge Cases
 
 ### 1. Token Count Accuracy
-- Uses actual token counts from LLM API response
-- Small variance due to tokenization method
-- Conservative estimate: rounds up on any uncertainty
+- Uses provider token counts when available
+- Falls back to a rough character-based estimate when a successful response omits usage data
+- Configured provider failures return zero tokens and are not added to the app's usage tracker
 
 ### 2. Fallback Behavior
-- If LLM doesn't return token counts, cost tracking is skipped
-- No cost recorded = no budget consumed (user-friendly)
-- Rare edge case; most providers return token data
+- Missing provider configuration produces a labeled simulation that is not tracked
+- Configured provider failures are not tracked or saved as answers
+- Successful responses without usage metadata are tracked using estimated token counts
 
 ### 3. No Persistent Storage
 - Cost data resets on new browser session
@@ -327,6 +330,6 @@ assert should_warn()  # 104% > 80%
 - **GDPR Right to Erasure:** Data deleted on session end
 - **Related Files:**
   - `src/cost_tracker.py` — Implementation
-  - `web_app.py` — Integration & display
+    - `app_pages/home.py` — Integration & display
   - `src/gdpr_compliance.py` — Data export integration
   - `src/i18n.py` — Budget info translations

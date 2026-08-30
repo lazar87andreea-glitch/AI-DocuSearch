@@ -1,5 +1,9 @@
 # AI DocuSearch — Implementation Improvements & Gap Analysis
 
+> Historical planning snapshot from 2026-08-25. Completion percentages, file locations, and
+> production-readiness statements below describe that snapshot and are not the current source of
+> truth. Use `README.md`, `Docs/MASTER_GUIDE.md`, and the step guides for current behavior.
+
 **Last Updated:** 2026-08-25 (Semantic fallback enhancement complete)  
 **Status:** 96%+ Complete - All core and compliance features implemented and tested
 

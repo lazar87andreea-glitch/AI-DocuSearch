@@ -157,9 +157,11 @@ def generate_answer_with_meta(
         # Try to get the answer from the API
         answer = ""
         api_error = ""
+        error_type = None
         prompt_tokens = 0
         completion_tokens = 0
         total_tokens = 0
+        usage_estimated = False
         success = False
         
         try:
@@ -196,8 +198,10 @@ def generate_answer_with_meta(
             total_tokens = int(usage.get("total_tokens") or 0)
             if prompt_tokens == 0:
                 prompt_tokens = _estimate_tokens(prompt)
+                usage_estimated = True
             if completion_tokens == 0:
                 completion_tokens = _estimate_tokens(answer)
+                usage_estimated = True
             if total_tokens == 0:
                 total_tokens = prompt_tokens + completion_tokens
                 
@@ -206,10 +210,11 @@ def generate_answer_with_meta(
             import traceback
             traceback.print_exc(file=sys.stderr)
             api_error = str(e)
-            answer = f"[ERROR] {type(e).__name__}: {e}"
-            prompt_tokens = _estimate_tokens(prompt)
-            completion_tokens = _estimate_tokens(answer)
-            total_tokens = prompt_tokens + completion_tokens
+            error_type = type(e).__name__
+            answer = ""
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
             success = False
         
         # Complete the run after all response metadata is available.
@@ -242,16 +247,18 @@ def generate_answer_with_meta(
                 traceback.print_exc(file=sys.stderr)
         
         # Return result
-        estimated_tokens = prompt_tokens is None or completion_tokens is None
         return {
             "answer": answer,
             "elapsed_seconds": time.perf_counter() - start,
+            "response_status": "success" if success else "error",
+            "error_type": error_type,
+            "error_message": api_error or None,
             "used_live_api": success,
             "langsmith_run_id": str(langsmith_run_id) if langsmith_run_id else None,
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "total_tokens": total_tokens,
-            "estimated_tokens": estimated_tokens,
+            "estimated_tokens": usage_estimated,
             "temperature": resolved_temperature,
         }
     else:
@@ -264,6 +271,9 @@ def generate_answer_with_meta(
     return {
         "answer": answer,
         "elapsed_seconds": time.perf_counter() - start,
+        "response_status": "simulated",
+        "error_type": "configuration_missing",
+        "error_message": "LLM provider configuration is incomplete.",
         "used_live_api": False,
         "langsmith_run_id": None,
         "prompt_tokens": prompt_tokens,

@@ -1,7 +1,7 @@
 # AI DocuSearch — Intelligent Document Q&A Powered by Grok
 
 **Developed by:** Andreea Nistor  
-**Last Updated:** 2026-08-20
+**Last Updated:** 2026-08-30
 
 ---
 
@@ -105,6 +105,10 @@ Upload a PDF/DOCX and ask anything about it.
 
 AI DocuSearch includes a **simple usage model** designed for experimentation while protecting API costs.
 
+The paid tiers below are product concepts only. They are not implemented or offered by the current
+free experimental project. The in-app percentage is an internal estimate based on fixed Grok rates,
+not a provider invoice.
+
 ### Pricing Table
 
 | Tier | Price | What You Get | Limits |
@@ -166,14 +170,14 @@ AI DocuSearch is designed for **safe experimentation** and responsible handling 
 
 - ✅ Uploaded PDFs/DOCX/TXT processed in **memory or temporary storage only**
 - ✅ Documents are **NOT saved** to any database, cloud storage, or persistent disk
-- ✅ All extracted text, embeddings, and intermediate data are **discarded when session ends**
+- ✅ Extracted text and embeddings remain only in Streamlit session memory and are discarded when that session is lost
 - ⚠️ Avoid uploading highly confidential or regulated documents in this demo
 
 ### 🗑️ Automatic Deletion
 
 - Temporary files removed immediately after processing
-- Session data (chunks, embeddings, answers) cleared on refresh/close
-- No long-term retention of documents or answers
+- Session document state is cleared when the Streamlit session ends; temporary upload copies are removed immediately after extraction
+- Successful questions and answers may be stored in server-local history JSON for the configured retention period
 
 ### 🛡️ Logging & Metadata
 
@@ -182,7 +186,7 @@ AI DocuSearch is designed for **safe experimentation** and responsible handling 
   - File size
   - Page count
   - Number of chunks
-- User questions and answers **NOT stored outside active session**
+- Successful user questions and answers are stored in per-session server-local history JSON when history is enabled
 
 ### 🔑 API Key Protection
 
@@ -222,10 +226,10 @@ By using AI DocuSearch, you agree to:
 ## 🗄️ Data Retention Policy (Summary)
 
 - ✅ Uploaded documents processed in memory or temp storage only
-- ✅ **No** documents, text, embeddings, or answers stored permanently
-- ✅ All temp data deleted automatically on session end
-- ✅ No user accounts or personal identifiers collected
-- ✅ Logs contain only minimal metadata
+- ✅ Uploaded-file copies are deleted immediately after extraction and page counting
+- ✅ Extracted text and embeddings are held in active Streamlit session memory
+- ⚠️ Successful questions, answers, metrics, and feedback may be written to server-local JSON
+- ✅ No user accounts are required; each session receives a random identifier
 - ✅ Local deployments: **you control all retention**
 
 ---
@@ -273,7 +277,7 @@ Future improvements for stronger security and privacy:
 - Streamlit UI with chat interface
 - Persistent question history (hybrid storage)
 - LangSmith manual tracing (implementation complete)
-- Multi-mode execution (RAG, Direct LLM, Hybrid)
+- Single Hybrid UI workflow with internal RAG, keyword-retrieval, and Direct LLM paths
 - Responsive mobile design
 
 ### ⚠️ In-Progress
@@ -487,4 +491,4 @@ LLM_MODEL=...
 ---
 
 **Last Updated:** 2026-08-20  
-**Status:** 85% Complete — Production-ready core, observability & UI enhancements in progress
+**Status:** Experimental project for local evaluation and controlled testing; not production-ready

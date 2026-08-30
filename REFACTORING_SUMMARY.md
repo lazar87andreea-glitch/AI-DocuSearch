@@ -1,5 +1,8 @@
 # Project Refactoring Summary: Hybrid Mode Only
 
+> Historical refactoring record. References to `web_app.py` below predate the split into the
+> `web_app.py` navigation entry point and `app_pages/home.py` implementation.
+
 ## Overview
 
 The AI DocuSearch project has been refactored to use **Hybrid Mode exclusively**. All UI controls for selecting between RAG, Direct LLM, and Hybrid modes have been removed. The app now provides a single, intelligent execution path that automatically attempts RAG retrieval and gracefully falls back to Direct LLM if needed.

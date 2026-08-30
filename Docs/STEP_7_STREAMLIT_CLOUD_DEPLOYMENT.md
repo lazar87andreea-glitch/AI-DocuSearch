@@ -51,7 +51,7 @@ Ensure your GitHub repository contains:
    LANGSMITH_PROJECT=ai-docusearch
    ```
 
-4. **web_app.py** — Main Streamlit application
+4. **web_app.py** — Streamlit navigation entry point; the main Q&A page is `app_pages/home.py`
 
 5. **.gitignore** — Should exclude `.env` and `__pycache__/`
 
@@ -124,8 +124,9 @@ HISTORY_LIMIT = "10"
    - Wait for extraction (green ✅ message)
 
 2. **Chat with the document**
-   - The app uses **Hybrid Mode** automatically — it intelligently tries RAG (retrieval-augmented generation)
-     and falls back to direct LLM if embeddings/retrieval is unavailable
+   - The app uses **Hybrid Mode** automatically: it attempts semantic retrieval, uses keyword
+     retrieval when the embedding index is unavailable, and can fall back to Direct LLM when the
+     pipeline is unavailable or the RAG answer is inconclusive
    - Type your question in the chat input box
    - Press Enter or click the input box to submit
    - Answer appears in the conversation thread below
@@ -159,14 +160,13 @@ Then in the deployed app, ask a question. Check your [LangSmith dashboard](https
 ### Device Support
 
 - **Desktop browsers** (Chrome, Firefox, Safari, Edge)
-  - ✅ Chat interface with all three modes (RAG, Direct LLM, Hybrid)
+  - ✅ Single Hybrid chat workflow
   - ✅ Conversation history with timestamps
   - ✅ Wide layout for readability
 
 - **Mobile browsers** (Android, iOS)
   - ✅ Same chat interface as desktop
-  - ✅ Direct LLM mode (recommended for mobile performance)
-  - ℹ️ RAG/Hybrid modes available but not recommended (uses more resources)
+  - ✅ Same automatic Hybrid execution path
   - ✅ Touch-friendly chat input
   - ✅ Responsive vertical layout
 
@@ -206,7 +206,7 @@ Then in the deployed app, ask a question. Check your [LangSmith dashboard](https
 
 ### Button Click Does Nothing
 
-**Symptom:** Click "Run Direct LLM" but no response
+**Symptom:** Submit a question but no response appears
 
 **Solutions:**
 1. Verify `OPENAI_API_KEY` is set in Secrets
@@ -230,7 +230,7 @@ Then in the deployed app, ask a question. Check your [LangSmith dashboard](https
 
 ### Change App Description
 
-Edit `web_app.py` line ~62:
+Edit the title/description section in `app_pages/home.py`:
 
 ```python
 st.markdown(
@@ -252,7 +252,7 @@ Change value to 0.1-1.0; push to GitHub.
 
 ### Hide Metrics by Default
 
-Edit `web_app.py` in `render_result()` function:
+Edit `app_pages/home.py` in `render_result()`:
 
 ```python
 show_flag = f"show_metrics_{mode_key}"

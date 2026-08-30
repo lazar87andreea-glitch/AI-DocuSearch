@@ -22,8 +22,8 @@ This ensures best-quality answers with reliable fallback behavior.
 ### 2. Multilingual and Localized Responses
 The UI automatically detects user language from browser headers or IP geolocation.
 The LLM is instructed to respond in the user's question language.
-All UI strings (upload prompts, messages, etc.) are translated to the user's language.
-Manual language selector in sidebar for override.
+Translated strings are available for English, Romanian, French, Spanish, and German. The current
+Home page does not expose the optional manual language selector, so failed detection defaults to English.
 
 ### 3. Document-aware and metadata-rich
 The system extracts and tracks document metadata (page count for PDFs).
@@ -41,7 +41,8 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 
 ## Current Status & Feature Completion
 
-**Overall:** ✅ **95%+ Complete** — All core features, compliance, and budget tracking fully implemented. Ready for production and user testing.
+**Overall:** Experimental and suitable for local evaluation and controlled user testing. It is not
+presented as production-ready; see the known limitations and legal documents before using sensitive data.
 
 | Step | Module | Status | Notes |
 |------|--------|--------|-------|
@@ -49,7 +50,7 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 | **Step 2** | Preprocessing | ✅ Complete | Chunking with overlap, cleaning |
 | **Step 3** | Embeddings & Index | ✅ Complete | FAISS + NumPy fallback, memory guards, lazy loading |
 | **Step 4** | AI Query + LangSmith | ✅ Complete | Full implementation with manual Client tracing working |
-| **Step 5** | Pipeline | ✅ Complete | End-to-end orchestration, lite mode fallback |
+| **Step 5** | Pipeline | ✅ Complete | Web embedding attempt with keyword and Direct LLM fallbacks |
 | **Step 6** | History Tracking | ✅ 95% | Hybrid storage (in-memory + disk) working; sidebar UI deferred |
 | **Step 7** | Cloud Deployment | ⚠️ 80% | Deploys; secrets loading partially hardened; needs testing |
 | **Step 8** | Feedback Collection | ✅ Complete | Thumbs up/down ratings, detailed feedback, per-session isolation |
@@ -57,7 +58,7 @@ No crashes, no frozen UI, no failed downloads — just reliable answers.
 | **Cost Tracking** | Budget Management | ✅ Complete | Grok pricing ($0.03/1K in, $0.10/1K out), real-time badge, warnings, blocking |
 | **GDPR Compliance** | Privacy & Legal | ✅ Complete | Consent banner, data export/deletion, footer links, legal docs |
 | **UI Chat** | Streamlit App | ✅ Complete | Hybrid mode only, chat bubbles, responsive mobile, page count |
-| **UI Metrics** | Display | ⚠️ Removed | User preference; metrics no longer shown in default view |
+| **UI Metrics** | Display | ✅ Available | Hidden by default behind the Show metrics control |
 
 ---
 
@@ -103,7 +104,11 @@ AI DocuSearch/
 ├── requirements.txt                   # Python dependencies
 ├── packages.txt                       # System dependencies (Streamlit Cloud)
 ├── demo.py                            # CLI demo script
-├── web_app.py                         # Streamlit web application
+├── web_app.py                         # Streamlit navigation entry point
+├── app_pages/
+│   ├── home.py                        # Main document Q&A application
+│   ├── privacy_policy.py              # In-app Privacy Policy
+│   └── terms_of_service.py            # In-app Terms of Service
 ├── test_ingest.py                     # Document ingestion tests
 ├── test_langsmith.py                  # LangSmith configuration verification
 ├── test_feedback.py                   # Feedback collection tests
@@ -153,11 +158,14 @@ Required variables:
 LLM_API_KEY=your_api_key
 LLM_API_BASE=https://api.x.ai/v1
 LLM_MODEL=grok-4
-DOCUSEARCH_LITE_MODE=true
 ```
 
 `LLM_API_BASE`/`LLM_MODEL` work with any OpenAI-compatible chat completions provider — point them
 at OpenAI, xAI/Grok, Groq, or another compatible provider.
+
+`DOCUSEARCH_LITE_MODE` is optional. It controls the default only when a pipeline caller omits
+`use_embeddings` (the CLI currently does). The Streamlit Home page passes `use_embeddings=True`,
+so this variable does not select the web app's initial retrieval mode.
 
 Optional variables:
 
@@ -193,7 +201,7 @@ pip install -r requirements.txt
 python -m streamlit run web_app.py
 ```
 
-After uploading a document and entering a question, select your preferred mode (**Direct LLM**, **RAG**, or **Hybrid**) and submit. The answer appears in the conversation thread instantly.
+After uploading a document and entering a question, the app runs its single **Hybrid** workflow.
 
 ## Example usage
 
@@ -203,12 +211,14 @@ python demo.py examples/sample.pdf "What are the contract dates?"
 
 ## Important runtime behavior
 
-The full pipeline can be heavy, especially when embedding models are downloaded and indexed locally. The project therefore includes logic to fall back to lightweight retrieval or direct LLM answering when:
+The web app explicitly attempts embeddings. The project can fall back to keyword retrieval or
+Direct LLM answering when:
 - memory is low
 - the index build fails
 - the environment is too constrained for a full embedding flow
 
-This is a practical design decision for local demo use and not a deviation from the RAG concept. The default design remains retrieval-based; the fallback exists to maintain stability.
+`DOCUSEARCH_LITE_MODE` is not part of this web decision because Home supplies an explicit
+`use_embeddings=True` argument. It remains available to CLI and library callers that omit the argument.
 
 ## Module responsibilities
 
@@ -259,7 +269,7 @@ For detailed deployment instructions, see **Docs/STEP_7_STREAMLIT_CLOUD_DEPLOYME
 
 ### Mobile Browser Optimization
 - Responsive 2-column layout on mobile (4-column on desktop)
-- Direct LLM mode optimized for mobile (RAG/Hybrid modes disabled due to resource limits)
+- Same Hybrid workflow as desktop, with a denser metrics layout
 - Touch-friendly buttons and text input
 
 ### LangSmith Integration Fix
@@ -308,16 +318,18 @@ The documents in the `Docs/` folder cover the project in a modular way:
 Use the lightweight mode or reduce the workload. The project includes environment-based fallback logic.
 
 ### Browser freezes
-This is usually caused by embedding/model startup on low-memory hardware. Prefer the lighter browser app or set `DOCUSEARCH_LITE_MODE=true`.
+This is usually caused by embedding/model startup on low-memory hardware. Reducing the document
+size can help. `DOCUSEARCH_LITE_MODE` does not change the current Streamlit path because Home
+explicitly requests embeddings.
 
 ### API errors
 Check `LLM_API_KEY`, `LLM_API_BASE`, and `LLM_MODEL` in `.env`.
 
-## Recommended final production stance
+## Recommended deployment stance
 
-For this repository, the recommended default is:
-- lightweight mode for real-world stability
-- retrieval-based flow when resources allow
+For this experimental repository, the current behavior is:
+- attempt semantic retrieval in the Streamlit app
+- use keyword retrieval when an embedding index cannot be built
 - any OpenAI-compatible LLM provider as the live reasoning layer
 
 This balances reliability, practicality, and the original RAG intent.

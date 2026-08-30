@@ -7,7 +7,7 @@
 ## Purpose
 
 - Collect user satisfaction ratings (thumbs up/down) on answers
-- Enable detailed feedback submission (text comments)
+- Store optional comments when supplied by another caller; the current UI exposes binary ratings only
 - Track feedback metrics for product analytics
 - Correlate feedback with answer quality metrics (tokens, retrieval performance, mode used)
 - Support feature requests and bug reports
@@ -18,12 +18,11 @@
 
 ### Feedback Types
 - **Answer Rating** — Quick binary thumbs up/down on generated answers (no modal/dialog)
-- **Detailed Feedback** — Optional text submission (feature request, bug report, praise)
-- **Session Isolation** — Each browser session has isolated feedback; no cross-user data leakage
+- **Detailed Feedback** — Supported by the storage API, but no text-feedback form is currently rendered
+- **Session Isolation** — Each browser session receives a random UUID and a separate feedback filename
 - **Analytics** — Feedback aggregated for product reporting without user identification
 
 ### Storage Architecture
-- **In-Memory Cache** (`st.session_state.feedback_cache`): Fast feedback status per answer ID
 - **Disk Storage** (`feedback/user_{session_id}.json`): Persistent feedback file, mirroring history structure
 - **Metrics Correlation** — Each feedback entry links to the answer's tokens, timing, retrieval data
 
@@ -32,7 +31,7 @@
 - ✅ Session-isolated (each browser session = separate feedback file)
 - ✅ No tracking of user behavior beyond submitted feedback
 - ✅ Optional text feedback (users can leave empty)
-- ✅ Local storage (no third-party analytics services by default)
+- ✅ Local JSON storage; when configured, the same rating is also sent best-effort to LangSmith
 
 ---
 
@@ -253,23 +252,23 @@ class FeedbackManager:
 
 ### Step 8.3: Web App Integration
 
-**File:** `web_app.py`
+**File:** `app_pages/home.py`
 
 **Initialization (add to startup section, ~line 150):**
 
 ```python
+from uuid import uuid4
+
 from src.feedback_manager import FeedbackManager
 
 # Initialize feedback manager
 if "feedback_manager" not in st.session_state:
-    session_id = str(hash(st.session_state.session_state_id))
+    session_id = uuid4().hex
+    st.session_state.session_id = session_id
     st.session_state.feedback_manager = FeedbackManager(session_id)
-
-# Cleanup old feedback on startup
-FeedbackManager.cleanup_old_feedback(
-    retention_days=int(os.getenv("FEEDBACK_RETENTION_DAYS", "90"))
-)
 ```
+
+`cleanup_old_feedback()` exists, but the current Home page does not invoke it automatically.
 
 **After Answer Generation (add after displaying answer, ~line 320):**
 

@@ -9,7 +9,7 @@ This project is designed to be simple, explainable, and Git-friendly while remai
 AI DocuSearch supports:
 - **PDF, DOCX, and TXT ingestion** — with automatic OCR fallback for scanned PDFs
 - **Multi-language support** — OCR works with Romanian, English, and other languages (via Tesseract)
-- **Multilingual UI** — Automatic language detection from browser/IP, with manual language selector (English, Romanian, French, Spanish, German)
+- **Multilingual UI** — Attempts automatic language detection from browser/IP signals and defaults to English when unavailable
 - **Document metadata** — Automatic page count detection for PDFs (users can ask "How many pages?")
 - **Cleaning and chunking for retrieval**
 - **Lightweight retrieval fallback** for low-memory environments
@@ -135,11 +135,14 @@ Example values:
 LLM_API_KEY=your_key_here
 LLM_API_BASE=https://api.x.ai/v1
 LLM_MODEL=grok-4
-DOCUSEARCH_LITE_MODE=true
 ```
 
 The `LLM_API_BASE`/`LLM_MODEL` pair can point at any OpenAI-compatible chat completions API —
 swap them for OpenAI, Groq, or another provider without changing any code.
+
+`DOCUSEARCH_LITE_MODE` is optional and applies only to pipeline callers that omit the
+`use_embeddings` argument, such as the CLI. The Streamlit app explicitly attempts embeddings and
+does not use this environment variable to select its initial retrieval mode.
 
 ## Run the app
 
@@ -149,9 +152,10 @@ python -m streamlit run web_app.py
 
 After uploading a document and asking a question, the app uses **Hybrid Mode** — the most intelligent and resilient approach:
 
-- **Hybrid Mode** — tries the full RAG pipeline first (chunks document, builds embedding index, retrieves relevant chunks)
-- Falls back to direct text-to-LLM if embeddings/retrieval fails (low memory, model unavailable, etc.)
-- Automatically adapts to available resources (works on mobile, desktop, low-memory environments)
+- **Hybrid Mode** — attempts an embedding index first, then uses retrieved chunks for RAG
+- Uses keyword retrieval if the embedding index cannot be built
+- Falls back to the full extracted text if the RAG pipeline is unavailable or its answer is inconclusive
+- Returns an explicit error without saving or counting a failed provider request
 - Provides best-quality answers with reliable fallback behavior
 
 The answer is displayed with a **📊 Show metrics** button underneath — click it to reveal total time, 
@@ -166,11 +170,14 @@ python demo.py examples/sample.pdf "What are the contract dates?"
 
 ## Important design note
 
-The project follows the intended RAG workflow whenever the embedding/index pipeline is available. However, for low-memory or low-resource environments, a safe fallback mode is enabled to prevent browser freezes and model-download failures.
+The Streamlit app always requests the embedding/index workflow. If the index cannot be built, the
+pipeline returns an index-free state and uses keyword retrieval. Direct LLM processing is a
+separate Hybrid fallback for an unavailable pipeline or an inconclusive RAG answer.
 
 This means:
-- full retrieval mode is the desired path
-- lightweight mode is the stability fallback
+- semantic retrieval is attempted first in the web app
+- keyword retrieval is the index fallback
+- `DOCUSEARCH_LITE_MODE` affects the CLI/default library call, not the web app
 - the configured LLM provider remains the live answer engine
 
 ## Files of interest
@@ -182,7 +189,8 @@ This means:
 - `src/prompt_loader.py` — loads prompt templates from `prompts/`
 - `prompts/rag_prompt.txt` — prompt template for retrieval-augmented generation (used when embeddings succeed)
 - `prompts/direct_llm_prompt.txt` — prompt template for direct LLM fallback (used when retrieval unavailable)
-- `web_app.py` — Streamlit browser app with Hybrid mode and performance metrics
+- `web_app.py` — Streamlit navigation entry point
+- `app_pages/home.py` — document upload, Hybrid Q&A, history, feedback, and metrics UI
 
 ## Adjusting temperature
 

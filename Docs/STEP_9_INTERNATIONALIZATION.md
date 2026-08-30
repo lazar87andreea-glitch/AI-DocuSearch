@@ -9,7 +9,7 @@
 - Detect user language automatically (browser headers, IP geolocation)
 - Provide translated UI for multiple languages (English, Romanian, French, Spanish, German)
 - Ensure LLM responds in the user's question language
-- Allow manual language override via sidebar selector
+- Provide a reusable manual-language selector helper (not currently rendered by the Home page)
 - Cache language preference in session state for consistency
 
 ## Key Concepts
@@ -17,7 +17,7 @@
 ### Language Detection Chain
 1. **Browser Accept-Language header** (most accurate) — extracted from HTTP headers
 2. **IP geolocation** (fallback) — detect country from user's IP, map to language
-3. **Manual selector** (user override) — sidebar dropdown to change language
+3. **Manual selector helper** — implemented in `src/i18n.py`, but not called by the current UI
 4. **Default fallback** — English if detection fails
 
 ### Supported Languages
@@ -97,20 +97,17 @@ def add_language_selector_sidebar() -> None:
         # User can change language, triggers st.rerun()
 ```
 
-### Integration: `web_app.py`
+### Integration: `app_pages/home.py`
 
-**1. Import i18n module:**
+**1. Import the functions used by the current page:**
 ```python
-from src.i18n import translate, get_user_language, add_language_selector_sidebar
+from src.i18n import translate, get_user_language
 ```
 
-**2. Add language selector to sidebar:**
-```python
-# In main app initialization
-add_language_selector_sidebar()
-```
+The optional `add_language_selector_sidebar()` helper exists but is not rendered by the current
+Home page. If automatic detection is unavailable, the session therefore uses English.
 
-**3. Replace hardcoded UI strings with `translate()` calls:**
+**2. Replace selected hardcoded UI strings with `translate()` calls:**
 ```python
 # Before
 st.file_uploader("Upload a PDF, DOCX or TXT file", type=["pdf", "docx", "txt"])
@@ -119,7 +116,7 @@ st.file_uploader("Upload a PDF, DOCX or TXT file", type=["pdf", "docx", "txt"])
 st.file_uploader(translate("upload_prompt"), type=["pdf", "docx", "txt"])
 ```
 
-**4. Use translate() for all UI messages:**
+**3. Use `translate()` for localized UI messages:**
 ```python
 st.info(translate("extracting"))
 st.success(f"{translate('extracted')} {len(text)} {translate('chars')}")
@@ -145,7 +142,7 @@ This ensures LLM responses are automatically multilingual.
 When detecting language, the system also extracts document metadata:
 
 ```python
-# In web_app.py
+# In app_pages/home.py
 with temporary_upload(uploaded.name, uploaded.getbuffer()) as file_path:
     document_text = extract_text(file_path)
     page_count = get_pdf_page_count(file_path) if file_path.lower().endswith(".pdf") else None

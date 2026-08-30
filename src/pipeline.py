@@ -150,6 +150,9 @@ def answer_question(
     return {
         "query": question,
         "raw_answer": meta["answer"],
+        "response_status": meta["response_status"],
+        "error_type": meta["error_type"],
+        "error_message": meta["error_message"],
         "source_chunks": indices,
         "lite_mode": lite_mode,
         "retrieval_seconds": retrieval_seconds,

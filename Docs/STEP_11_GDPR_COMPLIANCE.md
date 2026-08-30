@@ -2,16 +2,18 @@
 
 ## Overview
 
-**GDPR Compliance** implements user consent, data portability, erasure rights, and legal disclosures to ensure AI DocuSearch meets European (GDPR), American (CCPA), and international privacy regulations.
+This module provides consent, local-data export, local-data deletion, and legal disclosures intended
+to support privacy obligations. These technical controls do not by themselves certify compliance
+with GDPR, CCPA, or any other law.
 
 **Purpose:**
 - Obtain explicit user consent before processing documents
 - Provide users with data export (right to portability)
-- Enable users to delete all personal data (right to erasure)
+- Enable users to delete locally associated history, feedback, and selected in-memory document state
 - Transparently disclose third-party data sharing
 - Host Privacy Policy and Terms of Service
 
-**Status:** ✅ FULLY IMPLEMENTED (2026-08-25)
+**Status:** Implemented for experimental use; legal and security review is still required before production use.
 
 ---
 
@@ -23,7 +25,7 @@
 1. Display consent banner before document processing
 2. Manage consent state (accept/reject)
 3. Export user data in portable JSON format
-4. Permanently delete user data from storage
+4. Delete the current session's server-local history and feedback files and selected in-memory state
 5. Display third-party service disclosures
 
 **Key Functions:**
@@ -219,11 +221,13 @@ Your GDPR Rights:
 [☐ I understand - delete everything]
 ```
 
-**What's Deleted:**
+**What's currently deleted:**
 1. Chat history file (`history/user_{session_id}.json`)
 2. Feedback file (`feedback/user_{session_id}.json`) — if exists
-3. Session state variables
-4. Cost tracking data
+3. In-memory chat history, extracted document text, retrieval pipeline, and page count
+
+The current implementation does not clear every Streamlit state key or the session cost tracker,
+and it cannot delete copies already processed or retained by configured third-party services.
 
 **Implementation:**
 ```python
@@ -238,19 +242,22 @@ def delete_user_data(session_id, history_manager, feedback_manager=None):
     if feedback_file.exists():
         feedback_file.unlink()
     
-    # Clear session state
-    st.session_state.clear()
+    # Clear selected in-memory document and chat state
+    st.session_state.chat_history = []
+    st.session_state.document_text = None
+    st.session_state.rag_pipeline = None
+    st.session_state.page_count = None
     
     return True
 ```
 
 **User Confirmation:**
 ```
-✅ All your data has been permanently deleted!
-You can now upload a new document and start fresh.
+✅ Locally associated history, feedback, and selected document state were deleted.
 ```
 
-**Irreversible:** Once deleted, data cannot be recovered.
+Deletion of the local files is irreversible. Third-party retention is governed by each configured
+provider and is outside this control.
 
 ---
 
@@ -278,13 +285,14 @@ Displayed in footer + Privacy Policy:
 ### User Control
 - Users can disable LangSmith: Set `LANGSMITH_TRACING=false`
 - Language detection can't be disabled (required for UX)
-- Document text NOT shared if using lite mode (keyword-only search)
+- Relevant document chunks are sent to the configured LLM for RAG answers; the full extracted text
+  may be sent during Direct LLM fallback
 
 ---
 
 ## Integration Points
 
-### 1. Web App (`web_app.py`)
+### 1. Home Page (`app_pages/home.py`)
 
 **Consent Check (early):**
 ```python
@@ -501,6 +509,6 @@ For privacy inquiries, data requests, or concerns:
 
 ---
 
-**Last Updated:** 2026-08-25  
-**Version:** 1.0  
-**Status:** ✅ Production Ready
+**Last Updated:** 2026-08-30
+**Version:** 1.1
+**Status:** Experimental privacy controls; not a legal compliance certification

@@ -16,6 +16,7 @@
 
 ### Session Isolation
 - Each browser session = isolated "user" (Streamlit enforces this natively)
+- A random `uuid4().hex` identifier is generated once when the session initializes
 - Separate history files: `history/user_{session_id}.json`
 - One user cannot see another user's history or documents
 - Browser close/refresh = new session (new history file)
@@ -30,7 +31,7 @@
 - Concurrent users: separate `st.session_state`, separate history files
 - No cleanup contention: each session's cleanup doesn't affect others
 - No cross-user data leakage: Streamlit's isolation is enforced
-- Temp files scoped to each session; auto-cleaned on session end
+- Temporary upload copies use unique filenames and are deleted immediately after extraction and page counting
 
 ---
 
@@ -41,7 +42,8 @@
 
 **Design:**
 - **In-Memory Layer** (`st.session_state.chat_history`): Fast, survives Streamlit reruns within session, instant UI updates
-- **Disk Layer** (`history/user_{session_id}.json`): Persistent, survives browser refresh, enables analytics
+- **Disk Layer** (`history/user_{session_id}.json`): Server-local persistence associated with the
+    active session ID; it is not durable across Streamlit Cloud instance replacement
 
 **Class: `HistoryManager` (`src/history_manager.py`)**
 
@@ -113,17 +115,21 @@ class HistoryManager:
 ### Step 6.2: Web App Integration (IMPLEMENTED)
 **Purpose:** Wire history tracking into Streamlit app lifecycle
 
-**Initialization (lines ~150-152 in web_app.py):**
+**Initialization (`app_pages/home.py`):**
 ```python
+from uuid import uuid4
+
 if "history_manager" not in st.session_state:
-    session_id = str(hash(st.session_state.session_state_id))
+    session_id = uuid4().hex
+    st.session_state.session_id = session_id
     st.session_state.history_manager = HistoryManager(session_id)
+    st.session_state.feedback_manager = FeedbackManager(session_id)
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []  # In-memory cache
 ```
 
-**Cleanup on Startup (lines ~144-147):**
+**Cleanup on startup:**
 ```python
 if not os.path.exists("history"):
     os.makedirs("history")
@@ -132,7 +138,7 @@ HistoryManager.cleanup_old_sessions(
 )
 ```
 
-**Logging Function (lines ~281-324 in web_app.py):**
+**Logging function (`app_pages/home.py`):**
 ```python
 def log_to_history(mode: str, question: str, result: dict, document_name: str) -> None:
     """Log to both in-memory (session state) and disk (JSON file)"""
@@ -173,10 +179,11 @@ def log_to_history(mode: str, question: str, result: dict, document_name: str) -
     )
 ```
 
-**Calling** (line ~651 in web_app.py):
+**Calling:**
 ```python
-# After each mode completes
-log_to_history(mode, question, result, st.session_state.get("uploaded_name", "unknown"))
+# Only successful provider responses are stored.
+if result.get("response_status") == "success":
+    log_to_history("Hybrid", question, result, st.session_state.get("uploaded_name", "unknown"))
 ```
 
 ---
@@ -184,7 +191,7 @@ log_to_history(mode, question, result, st.session_state.get("uploaded_name", "un
 ### Step 6.3: Chat History Display (IMPLEMENTED)
 **Purpose:** Show conversation history in main chat area with message bubbles
 
-**Implementation (lines ~335-480 in web_app.py):**
+**Implementation (`app_pages/home.py`):**
 
 **Function: `render_chat_history()`**
 ```python
@@ -224,7 +231,7 @@ def render_chat_history() -> None:
 - Question text (full)
 - Answer text (full, truncated if very long)
 
-**Integration (line ~624 in web_app.py):**
+**Integration (`app_pages/home.py`):**
 ```python
 render_chat_history()  # Called in main container after document upload
 ```
@@ -234,7 +241,7 @@ render_chat_history()  # Called in main container after document upload
 ### Step 6.4: History Loading on Document Upload (IMPLEMENTED)
 **Purpose:** Restore previous questions when user re-uploads same document
 
-**Logic (lines ~564-574 in web_app.py):**
+**Logic (`app_pages/home.py`):**
 ```python
 if history_enabled and st.session_state.history_manager:
     # Get questions for this document from disk
@@ -261,7 +268,7 @@ if history_enabled and st.session_state.history_manager:
 **Current Status:** ⚠️ **Background tracking only** — Not displayed in UI  
 (History sidebar feature is in backlog; see `IMPLEMENTATION_IMPROVEMENTS.md` Sprint 2.1)
 
-**Function (lines ~463-480 in web_app.py):**
+**Planned function:**
 
 ```python
 def render_history_sidebar():
@@ -296,7 +303,8 @@ def render_history_sidebar():
     st.sidebar.divider()
 ```
 
-**Call this function in `web_app.py` before the main question input:**
+The current `render_history_sidebar()` in `app_pages/home.py` is intentionally a no-op. A future
+implementation would be called before the main question input.
 ```python
 render_history_sidebar()
 question = st.text_input("Ask a question about the document")
@@ -375,6 +383,7 @@ HISTORY_LIMIT=10              # Max history entries to show in sidebar
 **Files:**
 - `src/history_manager.py` — HistoryManager class (full implementation)
 
+```powershell
 # List questions for specific session
 python history_cli.py list --session user_abc123
 
@@ -483,7 +492,7 @@ HISTORY_LIMIT=10
 |---|---|---|
 | `src/history_manager.py` | New | Core history logic: JSON I/O, session management, filtering, cleanup |
 | `history_cli.py` | New | CLI tool for inspection and batch operations |
-| `web_app.py` | Modified | Initialize manager, log questions after each mode, render sidebar, call cleanup |
+| `app_pages/home.py` | Modified | Initialize manager, store successful answers, render chat history, call cleanup |
 | `.env` | Modified | Add config variables: HISTORY_ENABLED, HISTORY_RETENTION_DAYS, HISTORY_LIMIT |
 | `Docs/STEP_6_HISTORY_TRACKING.md` | New | This documentation |
 
@@ -507,7 +516,7 @@ HISTORY_LIMIT=10
 
 1. **Concurrent users in different browser sessions:**
    - Separate `st.session_state` objects (Streamlit enforces)
-   - Separate uploaded file temp locations (session-scoped)
+    - Unique temporary upload filenames removed immediately after extraction
    - Separate history JSON files (`user_session1.json`, `user_session2.json`)
    - No data leakage between users
 
@@ -555,7 +564,7 @@ For high-volume usage, consider:
 
 ## Integration with Existing Modules
 
-- **`web_app.py`** — Only integration point; calls HistoryManager after each query
+- **`app_pages/home.py`** — UI integration point; calls HistoryManager after successful queries
 - **`pipeline.py`** — No changes needed; metrics already available in result dict
 - **`ai_query.py`** — No changes needed; metrics already in return dict
 - **`ingest.py`**, **`preprocess.py`**, **`embed_index.py`**, **`prompt_loader.py`** — No changes needed
@@ -565,9 +574,9 @@ For high-volume usage, consider:
 ## Testing Checklist
 
 - [ ] `src/history_manager.py` created with all methods
-- [ ] `web_app.py` initializes HistoryManager on startup
+- [x] `app_pages/home.py` initializes HistoryManager with a random session UUID
 - [ ] Cleanup called on app startup
-- [ ] Questions logged after each mode (RAG/Direct/Hybrid)
+- [x] Successful Hybrid answers are logged; simulated and failed responses are excluded
 - [ ] Sidebar renders and filters by current document
 - [ ] Click sidebar question loads it into input field
 - [ ] Multiple documents in one session filter correctly

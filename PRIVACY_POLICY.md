@@ -64,7 +64,7 @@ We use collected information for:
 
 ### 5.1 Automatic Cleanup
 - **Chat History**: Deleted automatically after 30 days
-- **Feedback Data**: Deleted automatically after 90 days
+- **Feedback Data**: Stored locally until you use "Delete Data" for the current session or the service operator runs the available cleanup process
 - **Session Data**: Deleted when session ends
 - **Temporary Uploaded Files**: Uploaded files are copied to an application-specific directory on the host system only for extraction and PDF page counting. The application deletes each temporary copy immediately after that processing succeeds or fails. It keeps extracted text and an in-memory retrieval index for the active session instead of retaining the uploaded file. On startup, it also removes application-created upload files older than one hour that may have survived an interrupted server process.
 

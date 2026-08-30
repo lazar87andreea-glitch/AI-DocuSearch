@@ -45,11 +45,13 @@ def build_pipeline(file_path: str, use_embeddings: bool | None = None) -> Dict[s
    - Call `clean_text(text)` to remove artifacts
    - Call `chunk_text(cleaned)` to create overlapping chunks (default `chunk_size=500, overlap=100`)
 
-3. **Decide lite mode vs. full embeddings**
-   - If `use_embeddings` is not passed explicitly, it is derived from the `DOCUSEARCH_LITE_MODE`
-     environment variable (default `"true"`): lite mode is on unless the variable is explicitly falsy.
-   - If lite mode is active, the function returns immediately with `index: None` — no embedding
-     model is loaded at all.
+3. **Decide whether to attempt embeddings**
+     - The Streamlit app calls `build_pipeline_from_text(..., use_embeddings=True)`, so
+         `DOCUSEARCH_LITE_MODE` does not control the current web workflow.
+     - The environment variable is consulted only when a caller omits `use_embeddings`, including
+         the current CLI entry points. Its default is `"true"`, which selects keyword retrieval for
+         those callers.
+     - Passing `use_embeddings=False` also selects keyword retrieval directly.
 
 4. **Memory guard (only when not in lite mode)**
    - Before loading the embedding model, checks available physical memory on Windows via
@@ -100,31 +102,34 @@ def build_pipeline(file_path: str, use_embeddings: bool | None = None) -> Dict[s
     return {"index": index, "chunks": chunks, "lite_mode": False}
 ```
 
-**Example:**
+**Examples:**
 ```python
-# Initialize pipeline from document (mode chosen by DOCUSEARCH_LITE_MODE env var)
+# CLI/core use: mode is chosen by DOCUSEARCH_LITE_MODE because no override is passed.
 pipeline = build_pipeline("documents/contract.pdf")
 
-# Force full embedding mode regardless of the env var
+# Web-equivalent use: attempt embeddings regardless of DOCUSEARCH_LITE_MODE.
 pipeline = build_pipeline("documents/contract.pdf", use_embeddings=True)
 ```
 
 ---
 
-### Step 5.1b: Lite Mode & Memory Fallback
+### Step 5.1b: Web Mode, CLI Default, and Retrieval Fallback
 
-The project's default stance (see `MASTER_GUIDE.md`) is retrieval-based when resources allow, with a
-lightweight fallback for stability. `build_pipeline` implements this directly:
+The Streamlit app and callers that omit `use_embeddings` use different configuration paths:
 
 | Condition | Result |
 |---|---|
-| `DOCUSEARCH_LITE_MODE=true` (default) and `use_embeddings` not overridden | Lite mode — `index=None` |
-| `use_embeddings=True` passed explicitly | Full embedding attempt, subject to the memory guard below |
+| Streamlit app | Passes `use_embeddings=True`; `DOCUSEARCH_LITE_MODE` is ignored |
+| `use_embeddings=True` passed explicitly | Embedding attempt, subject to runtime fallback below |
+| `use_embeddings=False` passed explicitly | Keyword retrieval — `index=None` |
+| `use_embeddings` omitted and `DOCUSEARCH_LITE_MODE=true` (default) | Keyword retrieval — `index=None` |
+| `use_embeddings` omitted and `DOCUSEARCH_LITE_MODE=false` | Embedding attempt |
 | Available memory < 2 GB | Forced lite mode, even if `use_embeddings=True` |
 | `EmbedIndex` fails to load the model or build embeddings (e.g. `MemoryError`) | Forced lite mode |
 
 When `index` is `None`, `answer_question` (Step 5.2) uses a keyword-overlap search instead of
-semantic search — see `_lightweight_indices` below.
+semantic search — see `_lightweight_indices` below. In result metadata, `lite_mode=True` therefore
+means keyword retrieval was used; it does not necessarily mean the environment variable enabled it.
 
 ---
 
@@ -164,16 +169,15 @@ def answer_question(
      prompt file's directive is what controls it there.
 
 4. **Generate Answer (Step 4, timed and with token metrics)**
-   - Call `generate_answer_with_meta(prompt, temperature=resolved_temperature)` — live call to the
-     configured LLM provider, or simulated fallback — returning the answer plus `elapsed_seconds`,
-     token counts, the temperature actually used, and whether the tokens are estimated or came
-     from the provider's real `usage` field.
+   - Call `generate_answer_with_meta(prompt, temperature=resolved_temperature)` — a live provider
+    call, an explicit missing-config simulation, or a configured-provider error — returning the
+    answer state plus `elapsed_seconds`, token counts, temperature, and usage provenance.
 
 5. **Format Results**
    - Return dictionary with `query`, `raw_answer`, `source_chunks`, `lite_mode`, plus metrics:
      `retrieval_seconds`, `generation_seconds`, `total_seconds`, `chunk_count`, `context_chars`,
-     `prompt_tokens`, `completion_tokens`, `total_tokens`, `estimated_tokens`, `used_live_api`,
-     `temperature`
+         `prompt_tokens`, `completion_tokens`, `total_tokens`, `estimated_tokens`, `used_live_api`,
+         `response_status`, `error_type`, `error_message`, `temperature`
 
 **Implementation:**
 ```python
@@ -198,6 +202,9 @@ def answer_question(
     return {
         "query": question,
         "raw_answer": meta["answer"],
+        "response_status": meta["response_status"],
+        "error_type": meta["error_type"],
+        "error_message": meta["error_message"],
         "source_chunks": indices,
         "lite_mode": lite_mode,
         "retrieval_seconds": retrieval_seconds,
@@ -308,7 +315,8 @@ import time
 ```
 
 **Environment variables:**
-- `DOCUSEARCH_LITE_MODE` — controls the default of `use_embeddings` when not passed explicitly (defaults to lite mode on)
+- `DOCUSEARCH_LITE_MODE` — controls only callers that omit `use_embeddings`; it does not affect
+    the Streamlit app, which passes `use_embeddings=True`
 
 **Dependencies:**
 - All previous steps (ingest, preprocess, embed_index, ai_query)

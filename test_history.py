@@ -6,8 +6,29 @@ import json
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 from src.history_manager import HistoryManager
+
+
+TEST_SESSION_IDS = {
+    "test_session_1",
+    "test_session_2",
+    "test_session_3",
+    "test_session_4",
+    "test_session_6",
+    "test_old_session",
+    "session_A",
+    "session_B",
+}
+
+
+def cleanup_test_history() -> None:
+    """Remove only history files created by this test script."""
+    for session_id in TEST_SESSION_IDS:
+        path = Path("history") / f"user_{session_id}.json"
+        if path.exists():
+            path.unlink()
 
 
 def test_basic_history():
@@ -146,6 +167,23 @@ def test_multi_session_isolation():
     print("✓ PASSED: Multi-session isolation")
 
 
+def test_streamlit_session_ids_are_unique():
+    """Test that separate browser sessions cannot share persistence files."""
+    from streamlit.testing.v1 import AppTest
+
+    first = AppTest.from_file("web_app.py", default_timeout=20).run()
+    second = AppTest.from_file("web_app.py", default_timeout=20).run()
+
+    first_session_id = first.session_state["session_id"]
+    second_session_id = second.session_state["session_id"]
+
+    assert first_session_id != second_session_id
+    assert UUID(first_session_id).hex == first_session_id
+    assert UUID(second_session_id).hex == second_session_id
+
+    print("✓ PASSED: Streamlit session IDs are unique")
+
+
 def test_data_structure():
     """Test JSON structure is correct."""
     print("\n[TEST 6] JSON data structure")
@@ -228,6 +266,7 @@ def test_cleanup():
 
 def main():
     """Run all tests."""
+    cleanup_test_history()
     print("=" * 60)
     print("History Tracking Feature Tests")
     print("=" * 60)
@@ -238,6 +277,7 @@ def main():
         test_document_filtering()
         test_limit()
         test_multi_session_isolation()
+        test_streamlit_session_ids_are_unique()
         test_data_structure()
         test_cleanup()
         
@@ -256,6 +296,8 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
+    finally:
+        cleanup_test_history()
 
 
 if __name__ == "__main__":

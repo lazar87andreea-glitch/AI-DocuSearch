@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import re
+from uuid import uuid4
 
 # Prevent OpenBLAS/NumPy memory issues on low-memory machines.
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
@@ -153,7 +154,7 @@ cleanup_stale_uploads()
 
 # Initialize history manager and feedback manager for this session
 if "history_manager" not in st.session_state:
-    session_id = str(hash((st.session_state.session_id if hasattr(st.session_state, 'session_id') else id(st.session_state))) % (10 ** 8))
+    session_id = uuid4().hex
     st.session_state.session_id = session_id  # Store for GDPR access
     st.session_state.history_manager = HistoryManager(session_id)
     st.session_state.feedback_manager = FeedbackManager(session_id)
@@ -218,6 +219,9 @@ def run_direct(document_text: str, question: str, document_info: str = "Unknown"
     return {
         "query": question,
         "raw_answer": meta["answer"],
+        "response_status": meta["response_status"],
+        "error_type": meta["error_type"],
+        "error_message": meta["error_message"],
         "source_chunks": [],
         "lite_mode": True,
         "build_seconds": 0.0,
@@ -295,6 +299,10 @@ def run_hybrid(pipeline: dict | None, document_text: str, question: str, documen
     try:
         print(f"[HYBRID] Attempting RAG pipeline...", file=sys.stderr)
         result = run_rag(pipeline, question, document_info=document_info)
+        if result.get("response_status", "success") != "success":
+            result["mode"] = "Hybrid (RAG)"
+            return result
+
         answer_text = result.get('raw_answer', '')
         print(f"[HYBRID] RAG succeeded, answer length: {len(answer_text)} chars", file=sys.stderr)
 
@@ -901,19 +909,34 @@ if st.session_state.document_text:
                 print(f"[CHAT] Got result with keys: {list(result.keys())}", file=sys.stderr)
                 print(f"[CHAT] Result raw_answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)
 
-                # Track cost for this query
-                prompt_tokens = result.get("prompt_tokens", 0)
-                completion_tokens = result.get("completion_tokens", 0)
-                track_query_cost(prompt_tokens, completion_tokens)
-                print(f"[COST] Tracked query cost: {prompt_tokens} input + {completion_tokens} output tokens", file=sys.stderr)
+                response_status = result.get("response_status", "success")
+                if response_status == "success":
+                    # Track cost only when the provider returned a real answer.
+                    prompt_tokens = result.get("prompt_tokens", 0)
+                    completion_tokens = result.get("completion_tokens", 0)
+                    track_query_cost(prompt_tokens, completion_tokens)
+                    print(f"[COST] Tracked query cost: {prompt_tokens} input + {completion_tokens} output tokens", file=sys.stderr)
 
-                # Log to history
-                print(f"[CHAT] Calling log_to_history...", file=sys.stderr)
-                log_to_history(mode, question, result, st.session_state.get("uploaded_name", "unknown"))
-                print(f"[CHAT] log_to_history completed", file=sys.stderr)
+                    # Log only successful answers to history.
+                    print(f"[CHAT] Calling log_to_history...", file=sys.stderr)
+                    log_to_history(mode, question, result, st.session_state.get("uploaded_name", "unknown"))
+                    print(f"[CHAT] log_to_history completed", file=sys.stderr)
 
-                # Rerun to update chat history display with feedback buttons
-                st.rerun()
+                    # Rerun to update chat history display with feedback buttons
+                    st.rerun()
+                elif response_status == "simulated":
+                    st.warning(
+                        "The language model is not configured. This simulated preview was not "
+                        "saved to history or counted toward your usage."
+                    )
+                    st.write(result.get("raw_answer", ""))
+                else:
+                    st.error(
+                        "The language model provider could not complete this request. "
+                        "No answer was saved and the request was not counted toward this app's "
+                        "usage budget."
+                    )
+                    st.info("Please try again later or contact the application operator if the problem continues.")
 
             except Exception as e:
                 error_msg = f"{type(e).__name__}: {str(e)}"
