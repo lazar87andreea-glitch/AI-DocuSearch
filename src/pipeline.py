@@ -26,9 +26,15 @@ except Exception:
 def build_pipeline(file_path: str, use_embeddings: bool | None = None) -> Dict[str, Any]:
     import sys
     print(f"[PIPELINE] Starting build_pipeline for {file_path}", file=sys.stderr)
-    
+
     print(f"[PIPELINE] Extracting text...", file=sys.stderr)
     text = extract_text(file_path)
+    return build_pipeline_from_text(text, use_embeddings=use_embeddings)
+
+
+@traceable(run_type="chain", name="build_pipeline_from_text")
+def build_pipeline_from_text(text: str, use_embeddings: bool | None = None) -> Dict[str, Any]:
+    import sys
     text_size_mb = len(text) / (1024 * 1024)
     print(f"[PIPELINE] Extracted {len(text)} chars ({text_size_mb:.2f} MB)", file=sys.stderr)
     
@@ -156,6 +162,7 @@ def answer_question(
         "total_tokens": meta["total_tokens"],
         "estimated_tokens": meta["estimated_tokens"],
         "used_live_api": meta["used_live_api"],
+        "langsmith_run_id": meta["langsmith_run_id"],
         "temperature": meta["temperature"],
     }
 

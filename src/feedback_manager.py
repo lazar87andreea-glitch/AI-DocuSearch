@@ -43,6 +43,7 @@ class FeedbackManager:
         answer_length: int = 0,
         chunk_count: int = 0,
         retrieval_seconds: float = 0.0,
+        langsmith_run_id: Optional[str] = None,
     ) -> None:
         """
         Append feedback entry to session's JSON file with ISO 8601 timestamp
@@ -58,6 +59,7 @@ class FeedbackManager:
             answer_length: Characters in generated answer
             chunk_count: Number of chunks retrieved (0 if not applicable)
             retrieval_seconds: Time spent on retrieval (0.0 if not applicable)
+            langsmith_run_id: Run that receives this rating in LangSmith, if available
         """
         feedback_data = self.load_feedback()
 
@@ -73,6 +75,7 @@ class FeedbackManager:
             "answer_length": answer_length,
             "chunk_count": chunk_count,
             "retrieval_seconds": round(retrieval_seconds, 2),
+            "langsmith_run_id": langsmith_run_id,
         }
 
         feedback_data.append(entry)

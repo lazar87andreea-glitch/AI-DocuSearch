@@ -169,7 +169,7 @@ def delete_user_data(session_id: str, history_manager, feedback_manager=None) ->
         # Clear session state
         st.session_state.chat_history = []
         st.session_state.document_text = None
-        st.session_state.file_path = None
+        st.session_state.rag_pipeline = None
         st.session_state.page_count = None
         
         print(f"[GDPR] All data deleted for session {session_id}")
@@ -223,10 +223,17 @@ def show_gdpr_footer(session_id: str, history_manager, feedback_manager=None):
                 st.error(f"❌ Error: {e}")
     
     with col2:
+        show_delete_key = f"show_delete_confirmation_{session_id}"
+        confirm_delete_key = f"confirm_delete_{session_id}"
+
         if st.button("🗑️ Delete Data", use_container_width=True, help="Delete all your data (GDPR right to erasure)"):
+            st.session_state[show_delete_key] = True
+
+        if st.session_state.get(show_delete_key, False):
             st.warning("⚠️ This will permanently delete ALL your data!")
-            if st.checkbox("I understand - delete everything", key=f"confirm_delete_{session_id}"):
+            if st.checkbox("I understand - delete everything", key=confirm_delete_key):
                 if delete_user_data(session_id, history_manager, feedback_manager):
+                    st.session_state[show_delete_key] = False
                     st.success("✅ All data deleted!")
                     st.rerun()
                 else:
@@ -266,6 +273,7 @@ def show_third_party_disclosure():
         
         🔍 **LangSmith** (Debug & Monitor)
         - Traces your AI interactions for debugging
+        - May attach your Helpful/Not helpful rating to the answer trace
         - Detects and logs to https://smith.langchain.com
         - Can be disabled: `LANGSMITH_TRACING=false`
         

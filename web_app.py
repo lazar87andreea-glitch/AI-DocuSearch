@@ -1,6 +1,5 @@
 import os
 import sys
-import tempfile
 import time
 import re
 
@@ -37,7 +36,7 @@ def _initialize_langsmith():
                     converted = _to_env_string(value)
                     os.environ[key] = converted
                     if "LANGSMITH" in key or "LLM" in key:
-                        print(f"[INIT] Set {key} = {converted[:30]}...", file=sys.stderr)
+                        print(f"[INIT] Set {key} (configured)", file=sys.stderr)
             except AttributeError:
                 # Fallback for Streamlit secrets that don't support .items()
                 print(f"[INIT] st.secrets.items() failed, trying direct access", file=sys.stderr)
@@ -49,7 +48,7 @@ def _initialize_langsmith():
                         if value:
                             converted = _to_env_string(value)
                             os.environ[key] = converted
-                            print(f"[INIT] Set {key} = {converted[:30]}...", file=sys.stderr)
+                            print(f"[INIT] Set {key} (configured)", file=sys.stderr)
                     except Exception:
                         pass
         else:
@@ -96,12 +95,14 @@ traceable = _initialize_langsmith()
 # NOW import src modules (they will use traceable decorator with env vars set)
 from src.ingest import extract_text, get_pdf_page_count
 from src.ai_query import generate_answer_with_meta
-from src.pipeline import build_pipeline, answer_question
+from src.pipeline import build_pipeline_from_text, answer_question
+from src.upload_storage import cleanup_stale_uploads, temporary_upload
 from src.prompt_loader import load_prompt_with_temperature
 from src.i18n import translate, get_user_language
 from src.gdpr_compliance import show_consent_banner, show_gdpr_footer, show_third_party_disclosure
 from src.cost_tracker import initialize_cost_tracker, get_cost_badge, should_warn, is_blocked, track_query_cost
 from src.feedback_manager import FeedbackManager
+from src.langsmith_feedback import submit_langsmith_feedback
 
 # Initialize LangSmith client for manual tracing
 try:
@@ -146,6 +147,9 @@ def verify_langsmith_config():
 
 # Check config on startup (cached, runs once per session)
 _langsmith_config = verify_langsmith_config()
+
+# Recover upload files left by an interrupted server process without touching other temp files.
+cleanup_stale_uploads()
 
 st.set_page_config(page_title="AI DocuSearch", layout="wide")
 
@@ -200,23 +204,10 @@ if is_blocked():
     st.stop()
 
 
-def save_uploaded(uploaded_file):
-    suffix = os.path.splitext(uploaded_file.name)[1]
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    tmp.write(uploaded_file.getbuffer())
-    tmp.flush()
-    tmp.close()
-    return tmp.name
-
-
 @traceable(run_type="chain", name="web_app.rag_mode")
-def run_rag(file_path: str, question: str, document_info: str = "Unknown") -> dict:
-    t0 = time.perf_counter()
-    pipeline = build_pipeline(file_path, use_embeddings=True)
-    build_seconds = time.perf_counter() - t0
+def run_rag(pipeline: dict, question: str, document_info: str = "Unknown") -> dict:
     result = answer_question(pipeline, question, document_info=document_info)
-    result["build_seconds"] = build_seconds
-    result["total_seconds"] += build_seconds
+    result["build_seconds"] = 0.0
     result["fallback_reason"] = None
     result["mode"] = "RAG"
     return result
@@ -242,6 +233,7 @@ def run_direct(document_text: str, question: str, document_info: str = "Unknown"
         "total_tokens": meta["total_tokens"],
         "estimated_tokens": meta["estimated_tokens"],
         "used_live_api": meta["used_live_api"],
+        "langsmith_run_id": meta["langsmith_run_id"],
         "temperature": meta["temperature"],
         "fallback_reason": None,
     }
@@ -294,11 +286,17 @@ def _is_rag_inconclusive(answer: str) -> bool:
 
 
 @traceable(run_type="chain", name="web_app.hybrid_mode")
-def run_hybrid(file_path: str, document_text: str, question: str, document_info: str = "Unknown") -> dict:
+def run_hybrid(pipeline: dict | None, document_text: str, question: str, document_info: str = "Unknown") -> dict:
     print(f"[HYBRID] Starting Hybrid mode for question: {question[:50]}...", file=sys.stderr)
+    if pipeline is None:
+        fallback_result = run_direct(document_text, question, document_info=document_info)
+        fallback_result["fallback_reason"] = "RAG pipeline unavailable"
+        fallback_result["mode"] = "Hybrid (fallback to DirectLLM)"
+        return fallback_result
+
     try:
         print(f"[HYBRID] Attempting RAG pipeline...", file=sys.stderr)
-        result = run_rag(file_path, question, document_info=document_info)
+        result = run_rag(pipeline, question, document_info=document_info)
         answer_text = result.get('raw_answer', '')
         print(f"[HYBRID] RAG succeeded, answer length: {len(answer_text)} chars", file=sys.stderr)
         
@@ -370,14 +368,16 @@ def render_feedback(answer_id: str, question: str, result: dict) -> None:
                 answer_id=answer_id,
                 rating=True,
                 question=question,
-                document=document_name,
+                document_name=document_name,
                 comment="",
                 feedback_type="answer_rating",
                 mode=result.get("mode", "Hybrid"),
-                context_chars=result.get("context_chars", 0),
+                answer_length=len(str(result.get("raw_answer", ""))),
                 chunk_count=result.get("chunk_count", 0),
-                elapsed_seconds=result.get("total_seconds", 0)
+                retrieval_seconds=result.get("retrieval_seconds", 0),
+                langsmith_run_id=result.get("langsmith_run_id"),
             )
+            submit_langsmith_feedback(result.get("langsmith_run_id"), True)
             st.success("✅ Thanks for the feedback!")
             print(f"[FEEDBACK] Positive feedback for {answer_id}", file=sys.stderr)
     
@@ -387,14 +387,16 @@ def render_feedback(answer_id: str, question: str, result: dict) -> None:
                 answer_id=answer_id,
                 rating=False,
                 question=question,
-                document=document_name,
+                document_name=document_name,
                 comment="",
                 feedback_type="answer_rating",
                 mode=result.get("mode", "Hybrid"),
-                context_chars=result.get("context_chars", 0),
+                answer_length=len(str(result.get("raw_answer", ""))),
                 chunk_count=result.get("chunk_count", 0),
-                elapsed_seconds=result.get("total_seconds", 0)
+                retrieval_seconds=result.get("retrieval_seconds", 0),
+                langsmith_run_id=result.get("langsmith_run_id"),
             )
+            submit_langsmith_feedback(result.get("langsmith_run_id"), False)
             st.warning("📝 We'll use this to improve!")
             print(f"[FEEDBACK] Negative feedback for {answer_id}", file=sys.stderr)
 
@@ -449,6 +451,7 @@ def log_to_history(mode: str, question: str, result: dict, document_name: str) -
             "completion_tokens": result.get("completion_tokens", 0),
             "total_tokens": result.get("total_tokens", 0),
             "temperature": result.get("temperature", 0.2),
+            "langsmith_run_id": result.get("langsmith_run_id"),
         }
         
         # Create history entry with timestamp
@@ -610,6 +613,7 @@ def render_chat_history() -> None:
         mode = entry.get("mode", "")
         question = entry.get("question", "")
         answer = entry.get("answer", "")
+        metrics = entry.get("metrics", {})
         
         # User message (left-aligned)
         st.markdown(f"""
@@ -645,14 +649,16 @@ def render_chat_history() -> None:
                         answer_id=answer_id,
                         rating=True,
                         question=question,
-                        document=document_name,
+                        document_name=document_name,
                         comment="",
                         feedback_type="answer_rating",
                         mode=mode,
-                        context_chars=entry.get("context_chars", 0),
-                        chunk_count=entry.get("chunk_count", 0),
-                        elapsed_seconds=entry.get("elapsed_seconds", 0)
+                        answer_length=len(str(answer)),
+                        chunk_count=metrics.get("chunk_count", 0),
+                        retrieval_seconds=metrics.get("retrieval_seconds", 0),
+                        langsmith_run_id=metrics.get("langsmith_run_id"),
                     )
+                    submit_langsmith_feedback(metrics.get("langsmith_run_id"), True)
                     st.success("✅ Thanks for the feedback!")
                     print(f"[FEEDBACK] Positive feedback for {answer_id}", file=sys.stderr)
         
@@ -663,14 +669,16 @@ def render_chat_history() -> None:
                         answer_id=answer_id,
                         rating=False,
                         question=question,
-                        document=document_name,
+                        document_name=document_name,
                         comment="",
                         feedback_type="answer_rating",
                         mode=mode,
-                        context_chars=entry.get("context_chars", 0),
-                        chunk_count=entry.get("chunk_count", 0),
-                        elapsed_seconds=entry.get("elapsed_seconds", 0)
+                        answer_length=len(str(answer)),
+                        chunk_count=metrics.get("chunk_count", 0),
+                        retrieval_seconds=metrics.get("retrieval_seconds", 0),
+                        langsmith_run_id=metrics.get("langsmith_run_id"),
                     )
+                    submit_langsmith_feedback(metrics.get("langsmith_run_id"), False)
                     st.warning("📝 We'll use this to improve!")
                     print(f"[FEEDBACK] Negative feedback for {answer_id}", file=sys.stderr)
         
@@ -735,10 +743,10 @@ def render_aggregate_metrics() -> None:
         st.metric("Modes Used", modes_str, label_visibility="visible")
 
 
-if "file_path" not in st.session_state:
-    st.session_state.file_path = None
 if "document_text" not in st.session_state:
     st.session_state.document_text = None
+if "rag_pipeline" not in st.session_state:
+    st.session_state.rag_pipeline = None
 if "page_count" not in st.session_state:
     st.session_state.page_count = None
 if "extraction_seconds" not in st.session_state:
@@ -758,75 +766,86 @@ if uploaded is not None:
     if st.session_state.get("uploaded_name") != uploaded.name:
         st.session_state.uploaded_name = uploaded.name
         st.session_state.results = {}
-        
-        # Save file
+        st.session_state.document_text = None
+        st.session_state.rag_pipeline = None
+        st.session_state.page_count = None
+
+        # Extract while the temporary upload exists; the context always removes it.
         try:
-            st.session_state.file_path = save_uploaded(uploaded)
-            st.info(f"{translate('file_saved')}: {uploaded.name} ({uploaded.size} bytes)")
-        except Exception as e:
-            st.error(f"{translate('failed_save')}: {e}")
+            with temporary_upload(uploaded.name, uploaded.getbuffer()) as file_path:
+                st.info(f"{translate('file_saved')}: {uploaded.name} ({uploaded.size} bytes)")
+                st.info(translate("extracting"))
+                t0 = time.perf_counter()
+                document_text = extract_text(file_path)
+                extraction_seconds = time.perf_counter() - t0
+                page_count = (
+                    get_pdf_page_count(file_path)
+                    if file_path.lower().endswith(".pdf")
+                    else None
+                )
+
+            st.session_state.document_text = document_text
+            st.session_state.extraction_seconds = extraction_seconds
+            st.session_state.page_count = page_count
+
+            try:
+                st.session_state.rag_pipeline = build_pipeline_from_text(
+                    document_text,
+                    use_embeddings=True,
+                )
+            except Exception as pipeline_error:
+                st.session_state.rag_pipeline = None
+                print(
+                    f"[WARNING] RAG pipeline unavailable; Direct LLM fallback will be used: "
+                    f"{type(pipeline_error).__name__}: {pipeline_error}",
+                    file=sys.stderr,
+                )
+
+            size_mb = len(document_text) / (1024 * 1024)
+            page_info = ""
+            if page_count:
+                page_info = f", {page_count} {translate('pages')}"
+
+            st.success(
+                f"{translate('extracted')} {len(document_text)} {translate('chars')} "
+                f"({size_mb:.2f} {translate('mb')}){page_info} "
+                f"{translate('in')} {extraction_seconds:.2f}{translate('seconds')}"
+            )
+
+            # Load existing history for this document into session state (one-time per upload)
+            if history_enabled and st.session_state.history_manager:
+                try:
+                    doc_name = st.session_state.get("uploaded_name")
+                    if doc_name and doc_name not in st.session_state.loaded_docs:
+                        disk_history = st.session_state.history_manager.get_recent_questions(
+                            document_name=doc_name,
+                            limit=int(os.getenv("HISTORY_LIMIT", "10"))
+                        )
+                        if disk_history:
+                            # Prepend disk history to session state (oldest first)
+                            st.session_state.chat_history = disk_history + st.session_state.chat_history
+                            st.session_state.loaded_docs.add(doc_name)
+                            print(f"[HISTORY] Loaded {len(disk_history)} entries from disk for {doc_name}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[HISTORY] Failed to load disk history: {e}", file=sys.stderr)
+
+        except RuntimeError as e:
+            # OCR-related errors
+            st.warning(f"⚠️ **Note on scanned PDFs**: {e}")
+            st.info("📌 **Tip**: For best results, use PDFs with selectable text (not scanned images). "
+                    "If you have a scanned PDF in a non-English language, OCR may need configuration.")
             st.session_state.document_text = None
+            st.session_state.rag_pipeline = None
             st.session_state.page_count = None
-            st.session_state.file_path = None
+            print(f"[WARNING] Text extraction (OCR): {e}", file=sys.stderr)
+        except Exception as e:
+            st.error(f"{translate('failed_extract')}: {type(e).__name__}: {e}")
+            st.session_state.document_text = None
+            st.session_state.rag_pipeline = None
+            st.session_state.page_count = None
+            print(f"[ERROR] Text extraction failed: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
-        
-        # Extract text
-        if st.session_state.file_path:
-            st.info(translate("extracting"))
-            t0 = time.perf_counter()
-            try:
-                st.session_state.document_text = extract_text(st.session_state.file_path)
-                st.session_state.extraction_seconds = time.perf_counter() - t0
-                size_mb = len(st.session_state.document_text) / (1024 * 1024)
-                
-                # Get page count if it's a PDF
-                st.session_state.page_count = None
-                if st.session_state.file_path.lower().endswith('.pdf'):
-                    st.session_state.page_count = get_pdf_page_count(st.session_state.file_path)
-                
-                page_info = ""
-                if st.session_state.page_count:
-                    page_info = f", {st.session_state.page_count} {translate('pages')}"
-                
-                st.success(
-                    f"{translate('extracted')} {len(st.session_state.document_text)} {translate('chars')} "
-                    f"({size_mb:.2f} {translate('mb')}){page_info} "
-                    f"{translate('in')} {st.session_state.extraction_seconds:.2f}{translate('seconds')}"
-                )
-                
-                # Load existing history for this document into session state (one-time per upload)
-                if history_enabled and st.session_state.history_manager:
-                    try:
-                        doc_name = st.session_state.get("uploaded_name")
-                        if doc_name and doc_name not in st.session_state.loaded_docs:
-                            disk_history = st.session_state.history_manager.get_recent_questions(
-                                document_name=doc_name,
-                                limit=int(os.getenv("HISTORY_LIMIT", "10"))
-                            )
-                            if disk_history:
-                                # Prepend disk history to session state (oldest first)
-                                st.session_state.chat_history = disk_history + st.session_state.chat_history
-                                st.session_state.loaded_docs.add(doc_name)
-                                print(f"[HISTORY] Loaded {len(disk_history)} entries from disk for {doc_name}", file=sys.stderr)
-                    except Exception as e:
-                        print(f"[HISTORY] Failed to load disk history: {e}", file=sys.stderr)
-
-            except RuntimeError as e:
-                # OCR-related errors
-                st.warning(f"⚠️ **Note on scanned PDFs**: {e}")
-                st.info("📌 **Tip**: For best results, use PDFs with selectable text (not scanned images). "
-                       "If you have a scanned PDF in a non-English language, OCR may need configuration.")
-                st.session_state.document_text = None
-                st.session_state.page_count = None
-                print(f"[WARNING] Text extraction (OCR): {e}", file=sys.stderr)
-            except Exception as e:
-                st.error(f"{translate('failed_extract')}: {type(e).__name__}: {e}")
-                st.session_state.document_text = None
-                st.session_state.page_count = None
-                print(f"[ERROR] Text extraction failed: {e}", file=sys.stderr)
-                import traceback
-                traceback.print_exc()
 else:
     # No file uploaded yet - show helpful message
     if "uploaded_name" not in st.session_state:
@@ -874,7 +893,12 @@ if st.session_state.document_text:
                 
                 # Always use Hybrid mode (tries RAG, falls back to Direct LLM if needed)
                 print(f"[CHAT] Running Hybrid mode", file=sys.stderr)
-                result = run_hybrid(st.session_state.file_path, st.session_state.document_text, question, document_info=document_info)
+                result = run_hybrid(
+                    st.session_state.rag_pipeline,
+                    st.session_state.document_text,
+                    question,
+                    document_info=document_info,
+                )
                 
                 print(f"[CHAT] Got result with keys: {list(result.keys())}", file=sys.stderr)
                 print(f"[CHAT] Result raw_answer length: {len(result.get('raw_answer', ''))} chars", file=sys.stderr)

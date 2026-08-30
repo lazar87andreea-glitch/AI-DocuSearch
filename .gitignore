@@ -36,7 +36,12 @@ dist/
 # Streamlit
 .streamlit/
 
+# Runtime user data
+feedback/*.json
+history/user_*.json
 
 # Misc
 *.tmp
 *.bak
+langsmith_feedback_report.json
+langsmith_feedback_report.csv

@@ -44,7 +44,7 @@ elif mode == "Hybrid":
 mode = "Hybrid"  # Always use Hybrid
 
 # Always execute Hybrid mode
-result = run_hybrid(st.session_state.file_path, st.session_state.document_text, question)
+result = run_hybrid(st.session_state.rag_pipeline, st.session_state.document_text, question)
 ```
 
 ---
@@ -183,6 +183,12 @@ Hybrid-only architecture enables:
 - 📊 Better analytics on fallback frequency
 - 🚀 Optimizations based on fallback patterns
 - 🎯 Progressive enhancement (try fancier RAG first, reliable fallback always)
+
+### Privacy and Retention To-Do
+
+- [ ] Call `FeedbackManager.cleanup_old_feedback()` from the application lifecycle using the documented retention period.
+- [ ] Add a focused test proving expired feedback is removed while current feedback is retained.
+- [ ] Update `PRIVACY_POLICY.md` only after automatic feedback cleanup is deployed and verified.
 
 ---
 

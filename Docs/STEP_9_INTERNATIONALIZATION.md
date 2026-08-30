@@ -146,8 +146,9 @@ When detecting language, the system also extracts document metadata:
 
 ```python
 # In web_app.py
-if st.session_state.file_path.lower().endswith('.pdf'):
-    st.session_state.page_count = get_pdf_page_count(st.session_state.file_path)
+with temporary_upload(uploaded.name, uploaded.getbuffer()) as file_path:
+    document_text = extract_text(file_path)
+    page_count = get_pdf_page_count(file_path) if file_path.lower().endswith(".pdf") else None
 
 document_info = f"Document: {filename} | Pages: {page_count}"
 ```
@@ -156,7 +157,7 @@ This metadata is passed to the LLM:
 
 ```python
 result = run_hybrid(
-    file_path,
+    rag_pipeline,
     document_text,
     question,
     document_info=document_info  # NEW

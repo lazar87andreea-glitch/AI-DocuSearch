@@ -1,7 +1,9 @@
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 # Import traceable from web_app (already initialized with LangSmith credentials)
 # This ensures all modules use the same traceable instance
@@ -58,7 +60,7 @@ def generate_answer_with_meta(
 ) -> Dict[str, Any]:
     """Same resolution/request logic as generate_answer, plus timing and token metrics.
     
-    Uses manual LangSmith Client tracing (create_run/end_run) instead of @traceable decorator
+    Uses manual LangSmith Client tracing (create_run/update_run) instead of @traceable decorator
     to ensure outputs are properly captured. The decorator approach conflicts with manual
     tracing and causes "No outputs" in LangSmith dashboard.
     """
@@ -102,8 +104,7 @@ def generate_answer_with_meta(
 
     # Initialize LangSmith variables
     _ls_client = None
-    run = None
-    run_ended = False  # Track if we've already ended the run
+    langsmith_run_id = None
     
     if api_key and base_url and resolved_model:
         # Debug: Log LangSmith environment BEFORE creating client
@@ -134,27 +135,24 @@ def generate_answer_with_meta(
                 # Use explicit project_name from env to avoid Client state issues in Streamlit
                 project_name = os.getenv("LANGSMITH_PROJECT", "default")
                 print(f"[LANGSMITH] Using project_name: {project_name}", file=sys.stderr)
-                run = _ls_client.create_run(
+                langsmith_run_id = uuid4()
+                _ls_client.create_run(
                     name="generate_answer",
                     run_type="llm",
                     project_name=project_name,
+                    id=langsmith_run_id,
                     inputs={
                         "question": question_text[:300],
                         "prompt_length": len(prompt),
                         "model": resolved_model,
                     },
                 )
-                print(f"[LANGSMITH] create_run returned: {run} (type: {type(run)})", file=sys.stderr)
-                if run is None:
-                    print(f"[LANGSMITH] WARNING: create_run returned None! Tracing may be disabled.", file=sys.stderr)
-                    print(f"[LANGSMITH] Check LANGSMITH_TRACING and LANGSMITH_API_KEY", file=sys.stderr)
-                else:
-                    print(f"[LANGSMITH] Run created with ID: {run.id if hasattr(run, 'id') else run}", file=sys.stderr)
+                print(f"[LANGSMITH] Run created with ID: {langsmith_run_id}", file=sys.stderr)
             except Exception as e:
                 print(f"[LANGSMITH] Failed to create run: {type(e).__name__}: {e}", file=sys.stderr)
                 import traceback
                 traceback.print_exc(file=sys.stderr)
-                run = None
+                langsmith_run_id = None
         
         # Try to get the answer from the API
         answer = ""
@@ -214,38 +212,32 @@ def generate_answer_with_meta(
             total_tokens = prompt_tokens + completion_tokens
             success = False
         
-        # ALWAYS end the run (only once, AFTER we have all data)
-        print(f"[LANGSMITH] About to end run: run={run is not None}, _ls_client={_ls_client is not None}, run_ended={run_ended}, success={success}", file=sys.stderr)
+        # Complete the run after all response metadata is available.
+        print(f"[LANGSMITH] About to update run: run={langsmith_run_id is not None}, client={_ls_client is not None}, success={success}", file=sys.stderr)
         
-        if run and _ls_client and not run_ended:
+        if langsmith_run_id and _ls_client:
             try:
-                run_id = run.id if hasattr(run, 'id') else run
-                print(f"[LANGSMITH] Ending run with ID: {run_id}", file=sys.stderr)
-                print(f"[LANGSMITH] run object type: {type(run)}, run_id type: {type(run_id)}", file=sys.stderr)
-                
                 if success:
-                    # API call succeeded - end run with outputs
                     outputs = {
                         "answer": str(answer[:500]) if answer else "",
                         "prompt_tokens": int(prompt_tokens),
                         "completion_tokens": int(completion_tokens),
                         "total_tokens": int(total_tokens),
                     }
-                    print(f"[LANGSMITH] Outputs dict: {outputs}", file=sys.stderr)
-                    print(f"[LANGSMITH] Output types: answer={type(outputs['answer'])}, tokens={type(outputs['prompt_tokens'])}", file=sys.stderr)
-                    print(f"[LANGSMITH] Calling end_run with outputs...", file=sys.stderr)
-                    _ls_client.end_run(run_id, outputs=outputs)
-                    print(f"[LANGSMITH] end_run(outputs=...) completed without exception", file=sys.stderr)
+                    _ls_client.update_run(
+                        langsmith_run_id,
+                        outputs=outputs,
+                        end_time=datetime.now(timezone.utc),
+                    )
                 else:
-                    # API call failed - end run with error
-                    print(f"[LANGSMITH] Calling end_run with error: {api_error}", file=sys.stderr)
-                    _ls_client.end_run(run_id, error=api_error)
-                    print(f"[LANGSMITH] end_run(error=...) completed without exception", file=sys.stderr)
-                
-                run_ended = True
-                    
+                    _ls_client.update_run(
+                        langsmith_run_id,
+                        error=api_error,
+                        end_time=datetime.now(timezone.utc),
+                    )
+                print(f"[LANGSMITH] Run updated successfully", file=sys.stderr)
             except Exception as ls_error:
-                print(f"[LANGSMITH] CRITICAL ERROR: Failed to end_run: {type(ls_error).__name__}: {ls_error}", file=sys.stderr)
+                print(f"[LANGSMITH] Failed to update run: {type(ls_error).__name__}: {ls_error}", file=sys.stderr)
                 import traceback
                 traceback.print_exc(file=sys.stderr)
         
@@ -254,7 +246,8 @@ def generate_answer_with_meta(
         return {
             "answer": answer,
             "elapsed_seconds": time.perf_counter() - start,
-            "used_live_api": api_error is None,
+            "used_live_api": success,
+            "langsmith_run_id": str(langsmith_run_id) if langsmith_run_id else None,
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "total_tokens": total_tokens,
@@ -272,6 +265,7 @@ def generate_answer_with_meta(
         "answer": answer,
         "elapsed_seconds": time.perf_counter() - start,
         "used_live_api": False,
+        "langsmith_run_id": None,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
         "total_tokens": prompt_tokens + completion_tokens,

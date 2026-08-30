@@ -67,6 +67,7 @@ AI DocuSearch/
 ├── web_app.py
 ├── test_ingest.py
 ├── test_langsmith.py               # LangSmith configuration verification
+├── langsmith_feedback_report.py    # Reusable feedback export and summary CLI
 ├── src/
 │   ├── ai_query.py
 │   ├── embed_index.py
@@ -190,11 +191,34 @@ the LLM. If a prompt file has no such line, `LLM_TEMPERATURE` from `.env` is use
 Set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in `.env` (see `.env.example`) to send a run
 for every `generate_answer` call, `build_pipeline` call, and `answer_question` call to your
 [LangSmith](https://smith.langchain.com) dashboard — including latency and prompt/completion
-tokens. Runs for the Hybrid mode also show whether RAG succeeded or fell back to Direct LLM,
-nested as a trace tree. Tracing is entirely optional: if `langsmith` isn't installed or
+tokens. Each generated answer stores its LangSmith run ID. When `LANGSMITH_FEEDBACK_ENABLED=true`,
+the Helpful and Not helpful buttons attach a `user_rating` score of `1` or `0` to that run while
+retaining the local JSON copy. Tracing is entirely optional: if `langsmith` isn't installed or
 tracing isn't enabled, the app behaves exactly the same with no extra network calls.
 
 **Verify LangSmith is working:** Run `python test_langsmith.py` to confirm the connection to your LangSmith project.
+
+**Review user feedback:** Sign in to [LangSmith](https://smith.langchain.com), open **Tracing
+Projects**, select the project named by `LANGSMITH_PROJECT` (default: `ai-docusearch`), and open
+the `generate_answer` runs. Display or filter the Feedback column for `user_rating`: `1` means
+Helpful and `0` means Not helpful. Filter to `user_rating = 0` to inspect low-rated answers and
+compare their inputs, outputs, latency, tokens, and errors. Set `LANGSMITH_FEEDBACK_ENABLED=false`
+to keep ratings local only.
+
+**Export a reusable feedback report:** The standalone CLI works with any LangSmith project and
+defaults to exporting `user_rating = 0` runs as JSON:
+
+```powershell
+python langsmith_feedback_report.py --project ai-docusearch
+python langsmith_feedback_report.py --project ai-docusearch --format csv
+python langsmith_feedback_report.py --project another-project --score any --since 2026-08-01
+```
+
+The report includes feedback, errors, latency, token usage, cost, run names, and model counts.
+Run inputs and outputs are omitted by default because they may contain sensitive document content;
+add `--include-content` only when that data is needed. Use `--include-child-runs` for child-run
+summaries and `--output <path>` to choose a destination. The CLI reads `LANGSMITH_API_KEY` and can
+use `LANGSMITH_PROJECT` instead of an explicit `--project`.
 
 ## Streamlit Cloud Deployment
 
@@ -223,6 +247,7 @@ OPENAI_API_KEY = "sk-..."
 LANGSMITH_API_KEY = "lsv2_pt_..."
 LANGSMITH_TRACING = "true"
 LANGSMITH_PROJECT = "ai-docusearch"
+LANGSMITH_FEEDBACK_ENABLED = "true"
 ```
 
 **Note:** Replace with your actual API keys. These are NOT read from `.env` on Streamlit Cloud — they must be set in the web UI.

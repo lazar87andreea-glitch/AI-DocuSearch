@@ -1,22 +1,25 @@
 # Privacy Policy for AI DocuSearch
 
-**Last Updated:** August 25, 2026  
-**Effective Date:** August 25, 2026
+**Last Updated:** August 30, 2026
+**Effective Date:** August 30, 2026
 
 ## 1. Introduction
 
-AI DocuSearch ("Service," "Application," "we," "us," or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered document search application.
+AI DocuSearch ("Service" or "Application") is a free experimental personal project operated by Andreea Nistor. It is currently provided for testing and evaluation, without production-service, availability, or support guarantees. This Privacy Policy explains how information is processed when you test the Application.
 
 **Please read this Privacy Policy carefully.** If you do not agree with our policies and practices, please do not use our Service.
 
 ---
 
-## 2. Data Controller & Compliance
+## 2. Project Operator and Data Controller
 
-This Service is GDPR-compliant and respects user privacy rights under:
-- **General Data Protection Regulation (GDPR)** - EU/EEA residents
-- **California Consumer Privacy Act (CCPA)** - California residents
-- **Data Protection Laws** - Other applicable jurisdictions
+For data processed directly by this Application, the data controller is:
+
+- **Name:** Andreea Nistor
+- **Email:** lazar87andreea@gmail.com
+- **Project:** AI DocuSearch, a personal project offered free of charge for experimental testing
+
+The operator is an individual, not a company, and has not appointed a Data Protection Officer. The project aims to handle personal data consistently with applicable privacy requirements, including GDPR rights where they apply. Because this is an experimental service, users should not upload confidential, highly sensitive, or business-critical documents.
 
 ---
 
@@ -29,17 +32,16 @@ This Service is GDPR-compliant and respects user privacy rights under:
 - **Session Information**: Conversation history and interaction data
 
 ### 3.2 Information Automatically Collected
-- **IP Address**: For language detection via browser location/geolocation
-- **Browser Headers**: Accept-Language header for language preference
+- **Language Signals**: The Application may attempt to read an available `Accept-Language` header or perform server-side IP geolocation to choose a language. Depending on the hosting platform, these signals may describe the hosting server rather than the individual user and may be unavailable.
 - **Session ID**: Unique identifier for tracking your session
-- **Device Information**: Mobile/desktop detection for UI optimization
+- **Device Signal**: The Application may attempt to infer whether the browser is mobile when a user-agent signal is available. It does not intentionally create a detailed device profile.
 - **API Usage Metrics**: Token counts, response times, timestamps
 - **LangSmith Traces**: Debug logs for AI model performance monitoring
 
 ### 3.3 Cookies & Tracking
-- **Session Cookies**: Store user language preference and session state
+- **Session Connection**: Streamlit uses a browser connection to associate you with server-side session state while the Application is open.
 - **No Third-party Analytics**: We do not use Google Analytics or similar trackers
-- **Local Storage**: Session data persisted in browser (cleared on logout)
+- **Server-side Session State**: Language preference, uploaded-document state, and cost counters are primarily held in temporary server-side session state, not as permanent browser local storage. Session state may be lost when the tab disconnects or the server restarts.
 
 ---
 
@@ -64,17 +66,18 @@ We use collected information for:
 - **Chat History**: Deleted automatically after 30 days
 - **Feedback Data**: Deleted automatically after 90 days
 - **Session Data**: Deleted when session ends
-- **Temporary Files**: Deleted after upload processing completes
+- **Temporary Uploaded Files**: Uploaded files are copied to an application-specific directory on the host system only for extraction and PDF page counting. The application deletes each temporary copy immediately after that processing succeeds or fails. It keeps extracted text and an in-memory retrieval index for the active session instead of retaining the uploaded file. On startup, it also removes application-created upload files older than one hour that may have survived an interrupted server process.
 
 ### 5.2 User-Initiated Deletion
 You can delete all your data at any time:
-- Click "🗑️ Delete all my data (GDPR)" in the sidebar
-- All stored questions, answers, feedback, and session data will be permanently removed
+- Use "🗑️ Delete Data" in the Privacy & Data Management footer
+- This removes the current session's locally stored questions, answers, feedback, and in-memory document state
+- Temporary uploaded-file copies have already been removed after extraction; this control does not guarantee deletion of data already processed or retained by configured LLM providers or LangSmith
 - **This action is irreversible**
 
 ### 5.3 Data Portability
 You can download all your personal data at any time:
-- Click "📥 Download my data (GDPR)" in the sidebar
+- Use "📥 Download Data" in the Privacy & Data Management footer
 - Export includes: questions, answers, feedback, metrics
 - Format: JSON (machine-readable and portable to other services)
 
@@ -83,12 +86,12 @@ You can download all your personal data at any time:
 ## 6. Third-Party Data Sharing
 
 ### 6.1 LangSmith (Debugging & Tracing)
-- **Purpose**: Monitor AI model performance and debug issues
-- **Data Shared**: Questions, answers, session metadata
+- **Purpose**: Monitor AI model performance, debug issues, and associate Helpful/Not helpful ratings with the answer trace when LangSmith feedback collection is enabled
+- **Data Shared**: Questions, answers, session metadata, and positive or negative answer ratings
 - **Provider**: LangChain Inc.
 - **Privacy Policy**: https://docs.smith.langchain.com/
 - **Data Residency**: US (LangSmith servers)
-- **Opt-out**: Set `LANGSMITH_TRACING=false` in environment
+- **Tracing control**: Tracing is controlled by the Application operator through deployment configuration. Users cannot currently disable it from the interface. Do not use the Application if you do not consent to this processing while tracing is enabled.
 
 ### 6.2 LLM Providers (OpenAI, Grok, Groq, etc.)
 - **Purpose**: Process your questions through AI models
@@ -116,7 +119,7 @@ You can download all your personal data at any time:
 
 ### Security Measures
 - **Encryption in Transit**: HTTPS/TLS for all connections
-- **Local Storage**: Sensitive files stored in temporary directories with restricted access
+- **Temporary Processing**: Uploaded files are held in an application-specific temporary directory only during extraction and page counting, then deleted
 - **Access Control**: Only authorized processes access data
 - **No Database**: Data stored as JSON files locally (not cloud)
 - **Session Isolation**: Each user's data isolated by session ID
@@ -138,8 +141,8 @@ Request a copy of all personal data we hold about you
 
 ### Right to Rectification (Article 16)
 Request correction of inaccurate data
-- Edit your questions/feedback directly in the interface
-- Or: Contact us for assistance
+- The Application does not currently provide an interface for editing stored questions or feedback
+- Contact the project operator for assistance using the address in Section 10
 
 ### Right to Erasure (Article 17)
 Request permanent deletion of your data ("Right to be Forgotten")
@@ -154,8 +157,8 @@ Receive your data in structured, portable format
 
 ### Right to Object (Article 21)
 Object to processing for legitimate interests
-- Set environment: `LANGSMITH_TRACING=false`
-- Email us to request additional restrictions
+- The current interface does not provide an individual tracing opt-out
+- Stop using the Application and email the project operator to request additional restrictions or deletion where supported
 
 ### Right to Restrict Processing (Article 18)
 Request we limit how we use your data
@@ -163,9 +166,7 @@ Request we limit how we use your data
 - We'll accommodate reasonable requests
 
 ### Right Not to Be Subject to Automated Decisions (Article 22)
-Our AI decisions are not binding - always reviewed by you
-- You can request human review of any answer
-- Contact us if you believe a decision is unfair
+AI-generated answers are informational outputs and do not make binding decisions about users. The Application does not currently provide a formal human-review workflow. Do not rely on an answer as legal, medical, financial, or other professional advice.
 
 ---
 
@@ -182,15 +183,17 @@ California residents can submit requests by contacting us (Section 10).
 
 ---
 
-## 10. Contact & Data Protection Officer
+## 10. Contact
 
 ### Privacy Questions & Requests
-**Email**: [your-contact-email]  
+**Operator**: Andreea Nistor
+
+**Email**: lazar87andreea@gmail.com
+
 **GitHub**: https://github.com/lazar87andreea-glitch/AI-DocuSearch  
 **Response Time**: We aim to respond within 30 days
 
-### Data Protection Officer
-If you have concerns about our data handling, you can contact:
+No Data Protection Officer has been appointed because this is an individually operated experimental project, not a company. If you have concerns about data handling, contact the operator first. You may also contact:
 - **Your Local Data Protection Authority** (DPA)
 - **EU**: https://edpb.ec.europa.eu/edpb/node
 - **UK**: https://ico.org.uk/
@@ -220,10 +223,10 @@ We may update this Privacy Policy periodically. The "Last Updated" date above in
 
 | Control | Location | Effect |
 |---------|----------|--------|
-| **Download Data** | Sidebar "📥 Download my data" | Get JSON export of all data |
-| **Delete Data** | Sidebar "🗑️ Delete my data" | Permanently remove all stored data |
-| **Language Override** | NOT USED (auto-detected only) | - |
-| **Disable Tracing** | Environment: `LANGSMITH_TRACING=false` | Stop debug logs from being sent |
+| **Download Data** | Footer "📥 Download Data" | Get a JSON export of locally associated session data |
+| **Delete Data** | Footer "🗑️ Delete Data" | Remove current-session history, feedback, and in-memory document state; third-party copies are subject to provider controls and retention policies |
+| **Language Override** | Not currently available | Language is automatically detected when possible and otherwise defaults to English |
+| **Disable Tracing** | Not currently available to users | Deployment configuration is controlled by the project operator |
 | **Clear History** | Automatic after 30 days | Questions/answers auto-deleted |
 
 ---
