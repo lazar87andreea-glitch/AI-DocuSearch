@@ -11,6 +11,8 @@ AI DocuSearch supports:
 - **Multi-language support** — OCR works with Romanian, English, and other languages (via Tesseract)
 - **Multilingual UI** — Attempts automatic language detection from browser/IP signals and defaults to English when unavailable
 - **Document metadata** — Automatic page count detection for PDFs (users can ask "How many pages?")
+- **PDF page requests** — Physical PDF page identity is preserved, so users can ask for a page or
+      a range such as "read pages 12-14"
 - **Cleaning and chunking for retrieval**
 - **Lightweight retrieval fallback** for low-memory environments
 - **Live LLM integration** with any OpenAI-compatible provider (OpenAI, xAI/Grok, Groq, etc.)
@@ -159,6 +161,11 @@ After uploading a document and asking a question, the app uses **Hybrid Mode** �
 - Falls back to the full extracted text if the RAG pipeline is unavailable or its answer is inconclusive
 - Returns an explicit error without saving or counting a failed provider request
 - Provides best-quality answers with reliable fallback behavior
+
+Explicit PDF page requests bypass semantic ranking and retrieve all chunks from the requested
+physical PDF pages. Up to five pages are included per request. Physical PDF numbering starts at the
+first file page and may differ from a page number printed inside a book because covers and front
+matter count as PDF pages. DOCX and TXT files do not provide stable page boundaries.
 
 The answer is displayed with a **📊 Show metrics** button underneath — click it to reveal total time, 
 build/retrieval/generation time breakdown, chunks used, context size, and token counts. Metrics stay hidden 

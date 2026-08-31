@@ -266,6 +266,7 @@ def run_direct(document_text: str, question: str, document_info: str = "Unknown"
         "langsmith_run_id": meta["langsmith_run_id"],
         "temperature": meta["temperature"],
         "fallback_reason": None,
+        "requested_pdf_pages": [],
     }
 
 
@@ -276,6 +277,7 @@ def _is_rag_inconclusive(answer: str) -> bool:
         # English patterns
         "does not provide",
         "does not contain",
+        "do not contain",
         "not found in",
         "cannot find",
         "i don't know",
@@ -335,7 +337,7 @@ def run_hybrid(pipeline: dict | None, document_text: str, question: str, documen
         print(f"[HYBRID] RAG succeeded, answer length: {len(answer_text)} chars", file=sys.stderr)
 
         # Check if RAG returned an inconclusive answer
-        if _is_rag_inconclusive(answer_text):
+        if not result.get("requested_pdf_pages") and _is_rag_inconclusive(answer_text):
             print(f"[HYBRID] RAG returned inconclusive answer. Trying Direct LLM for better results...", file=sys.stderr)
             fallback_result = run_direct(document_text, question, document_info=document_info)
             fallback_result["fallback_reason"] = "RAG found insufficient information in document"

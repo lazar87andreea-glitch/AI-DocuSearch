@@ -3,8 +3,16 @@ import sys
 import importlib.util
 import time
 from pathlib import Path
-from src.ingest import extract_text
+from types import ModuleType
+from unittest.mock import Mock, patch
+
+from src.ingest import (
+    extract_text,
+    extract_text_from_pdf,
+    extract_text_from_pdf_ocr,
+)
 from src.pipeline import build_pipeline_from_text
+from src.preprocess import chunk_text
 from src.upload_storage import (
     UPLOAD_PREFIX,
     UPLOAD_TEMP_DIR,
@@ -72,6 +80,85 @@ def test_extract_text_doc_unsupported():
         os.remove(path)
 
 
+def test_searchable_pdf_extraction_preserves_page_numbers():
+    pages = []
+    for text in ["Cover", "", "Chapter one"]:
+        page = Mock()
+        page.extract_text.return_value = text
+        pages.append(page)
+
+    with patch("pypdf.PdfReader", return_value=Mock(pages=pages)):
+        result = extract_text_from_pdf("example.pdf")
+
+    assert result == (
+        "[PDF_PAGE:1]\nCover\n\n"
+        "[PDF_PAGE:2]\n\n\n"
+        "[PDF_PAGE:3]\nChapter one"
+    )
+
+
+def test_ocr_pdf_extraction_preserves_empty_page_numbers():
+    images = [object(), object(), object()]
+    pdf2image = ModuleType("pdf2image")
+    pdf2image.convert_from_path = Mock(return_value=images)
+    pytesseract = ModuleType("pytesseract")
+    pytesseract.pytesseract = Mock()
+    pytesseract.image_to_string = Mock(
+        side_effect=["Cover", RuntimeError(), "Body"]
+    )
+
+    with patch.dict(
+        sys.modules,
+        {"pdf2image": pdf2image, "pytesseract": pytesseract},
+    ):
+        result = extract_text_from_pdf_ocr("example.pdf")
+
+    assert "[PDF_PAGE:1]\nCover" in result
+    assert result.index("[PDF_PAGE:1]") < result.index("[PDF_PAGE:2]")
+    assert result.index("[PDF_PAGE:2]") < result.index("[PDF_PAGE:3]")
+    assert result.endswith("[PDF_PAGE:3]\nBody")
+
+
+def test_marker_only_pdf_extraction_triggers_ocr():
+    path = Path("temp_scanned_test.pdf")
+    path.touch()
+    try:
+        with (
+            patch(
+                "src.ingest.extract_text_from_pdf",
+                return_value="[PDF_PAGE:1]\n\n[PDF_PAGE:2]",
+            ),
+            patch(
+                "src.ingest.extract_text_from_pdf_ocr",
+                return_value="[PDF_PAGE:1]\nScanned content",
+            ) as ocr,
+        ):
+            result = extract_text(str(path))
+
+        assert result == "[PDF_PAGE:1]\nScanned content"
+        ocr.assert_called_once()
+    finally:
+        path.unlink(missing_ok=True)
+
+
+def test_pdf_chunking_never_crosses_page_boundaries():
+    text = (
+        "[PDF_PAGE:1]\n" + ("First page. " * 80) + "\n\n"
+        "[PDF_PAGE:2]\n" + ("Second page. " * 80)
+    )
+
+    chunks = chunk_text(text, chunk_size=120, overlap=20)
+
+    assert len(chunks) > 2
+    assert all(chunk.startswith("[PDF_PAGE:") for chunk in chunks)
+    assert all(
+        not ("First page." in chunk and "Second page." in chunk)
+        for chunk in chunks
+    )
+    assert any(chunk.startswith("[PDF_PAGE:1]") for chunk in chunks)
+    assert any(chunk.startswith("[PDF_PAGE:2]") for chunk in chunks)
+
+
 def test_temporary_upload_cleanup_after_success():
     upload_path = ""
     with temporary_upload("example.txt", b"temporary content") as path:
@@ -133,6 +220,10 @@ def run_tests():
     test_extract_text_file_not_found()
     test_extract_text_docx_support()
     test_extract_text_doc_unsupported()
+    test_searchable_pdf_extraction_preserves_page_numbers()
+    test_ocr_pdf_extraction_preserves_empty_page_numbers()
+    test_marker_only_pdf_extraction_triggers_ocr()
+    test_pdf_chunking_never_crosses_page_boundaries()
     test_temporary_upload_cleanup_after_success()
     test_temporary_upload_cleanup_after_failure()
     test_pipeline_remains_usable_after_upload_cleanup()

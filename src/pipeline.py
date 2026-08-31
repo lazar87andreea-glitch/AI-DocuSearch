@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from .ingest import extract_text
 from .preprocess import clean_text, chunk_text
@@ -6,6 +7,16 @@ from .embed_index import EmbedIndex
 from .ai_query import generate_answer_with_meta
 from .prompt_loader import load_prompt_with_temperature
 from typing import Dict, Any
+
+PDF_PAGE_CHUNK_PATTERN = re.compile(r"^\[PDF_PAGE:(\d+)\]")
+PDF_PAGE_REQUEST_PATTERN = re.compile(
+    r"\b(?:pdf\s+)?(?:page|pages|pagina|pagină|pagini|paginile|página|páginas|seite|seiten)"
+    r"\s*(?:(?:number|no\.?|nr\.?|numéro|numero|nummer)\s*)?(\d+)"
+    r"(?:\s*(?:-|–|—|to|through|bis|à|hasta|până\s+la)\s*(\d+))?\b",
+    re.IGNORECASE,
+)
+MAX_REQUESTED_PDF_PAGES = 5
+MAX_PAGE_CONTEXT_CHARS = 30_000
 
 # Import traceable from langsmith (initialized by web_app with credentials)
 try:
@@ -128,13 +139,50 @@ def _lightweight_indices(chunks: list[str], question: str, top_k: int = 3) -> li
     return selected
 
 
+def _requested_pdf_pages(question: str) -> list[int]:
+    match = PDF_PAGE_REQUEST_PATTERN.search(question)
+    if not match:
+        return []
+
+    first_page = int(match.group(1))
+    last_page = int(match.group(2) or first_page)
+    if first_page < 1 or last_page < first_page:
+        return []
+    return list(range(first_page, min(last_page, first_page + MAX_REQUESTED_PDF_PAGES - 1) + 1))
+
+
+def _pdf_page_request_is_truncated(question: str, page_numbers: list[int]) -> bool:
+    match = PDF_PAGE_REQUEST_PATTERN.search(question)
+    return bool(
+        match
+        and match.group(2)
+        and page_numbers
+        and int(match.group(2)) > page_numbers[-1]
+    )
+
+
+def _indices_for_pdf_pages(chunks: list[str], page_numbers: list[int]) -> list[int]:
+    requested = set(page_numbers)
+    indices: list[int] = []
+    for index, chunk in enumerate(chunks):
+        marker = PDF_PAGE_CHUNK_PATTERN.match(chunk)
+        if marker and int(marker.group(1)) in requested:
+            indices.append(index)
+    return indices
+
+
 @traceable(run_type="chain", name="answer_question")
 def answer_question(
     pipeline: Dict[str, Any], question: str, top_k: int = 3, temperature: float | None = None, document_info: str = "Unknown"
 ) -> Dict[str, Any]:
     chunks = pipeline.get("chunks", [])
     retrieval_start = time.perf_counter()
-    if pipeline.get("index") is None:
+    requested_pages = _requested_pdf_pages(question)
+    page_indices = _indices_for_pdf_pages(chunks, requested_pages)
+    if requested_pages:
+        indices = page_indices
+        lite_mode = pipeline.get("index") is None
+    elif pipeline.get("index") is None:
         indices = _lightweight_indices(chunks, question, top_k=top_k)
         lite_mode = True
     else:
@@ -144,6 +192,37 @@ def answer_question(
     retrieval_seconds = time.perf_counter() - retrieval_start
 
     context = "\n\n".join(chunks[i] for i in indices if i < len(chunks))
+    if requested_pages:
+        requested_label = ", ".join(str(page) for page in requested_pages)
+        range_notice = ""
+        if _pdf_page_request_is_truncated(question, requested_pages):
+            range_notice = (
+                f" The request exceeded the {MAX_REQUESTED_PDF_PAGES}-page limit, so only "
+                "these first requested pages are included. Ask for the remaining pages in a "
+                "separate question."
+            )
+        if context:
+            context = (
+                f"[PAGE_REQUEST: Physical PDF page(s) {requested_label}. PDF page numbers may "
+                f"differ from page numbers printed inside the document.{range_notice}]\n\n"
+                f"{context[:MAX_PAGE_CONTEXT_CHARS]}"
+            )
+        else:
+            available_pages = sorted(
+                {
+                    int(marker.group(1))
+                    for chunk in chunks
+                    if (marker := PDF_PAGE_CHUNK_PATTERN.match(chunk))
+                }
+            )
+            available_label = (
+                f"1-{available_pages[-1]}" if available_pages else "none"
+            )
+            context = (
+                f"[PAGE_REQUEST_UNAVAILABLE: Physical PDF page(s) {requested_label} were "
+                f"requested, but no matching page text was extracted. Available physical PDF "
+                f"pages: {available_label}. Explain this limitation without inventing content.]"
+            )
     prompt, file_temperature = load_prompt_with_temperature("rag_prompt", context=context, question=question, document_info=document_info)
     meta = generate_answer_with_meta(prompt, temperature=temperature if temperature is not None else file_temperature)
 
@@ -167,6 +246,7 @@ def answer_question(
         "used_live_api": meta["used_live_api"],
         "langsmith_run_id": meta["langsmith_run_id"],
         "temperature": meta["temperature"],
+        "requested_pdf_pages": requested_pages,
     }
 
 

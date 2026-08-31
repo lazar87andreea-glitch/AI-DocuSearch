@@ -1,5 +1,15 @@
 import os
+import re
 from typing import List
+
+
+def _format_pdf_page(page_number: int, text: str) -> str:
+    return f"[PDF_PAGE:{page_number}]\n{text.strip()}"
+
+
+def _has_pdf_page_content(text: str) -> bool:
+    without_markers = re.sub(r"(?m)^\[PDF_PAGE:\d+\]\s*$", "", text)
+    return bool(without_markers.strip())
 
 
 def extract_text_from_pdf(path: str) -> str:
@@ -10,9 +20,9 @@ def extract_text_from_pdf(path: str) -> str:
 
     reader = PdfReader(path)
     texts: List[str] = []
-    for page in reader.pages:
-        texts.append(page.extract_text() or "")
-    return "\n".join(texts).strip()
+    for page_number, page in enumerate(reader.pages, start=1):
+        texts.append(_format_pdf_page(page_number, page.extract_text() or ""))
+    return "\n\n".join(texts).strip()
 
 
 def get_pdf_page_count(path: str) -> int:
@@ -69,14 +79,13 @@ def extract_text_from_pdf_ocr(path: str, poppler_path: str | None = None) -> str
         images = convert_from_path(path, dpi=300)
 
     page_texts: List[str] = []
-    for img in images:
+    for page_number, img in enumerate(images, start=1):
         try:
             text = pytesseract.image_to_string(img, lang=None)
         except Exception:
             text = ""
-        if text:
-            page_texts.append(text)
-    return "\n".join(page_texts).strip()
+        page_texts.append(_format_pdf_page(page_number, text))
+    return "\n\n".join(page_texts).strip()
 
 
 def extract_text_from_docx(path: str) -> str:
@@ -114,7 +123,7 @@ def extract_text(path: str) -> str:
     if ext == ".pdf":
         # Try normal PDF extraction first
         text = extract_text_from_pdf(path)
-        if text and text.strip():
+        if _has_pdf_page_content(text):
             return text
 
         # If no text found, attempt OCR fallback. Allows using POPPLER_PATH env var.

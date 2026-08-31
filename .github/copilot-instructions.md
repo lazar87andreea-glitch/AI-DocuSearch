@@ -58,8 +58,13 @@ python test_langsmith.py
   `src/pipeline.py` -> `src/ai_query.py`. `src/prompt_loader.py` keeps prompt text and sampling
   configuration outside Python code.
 - `src/ingest.py` handles searchable PDFs with `pypdf`, then attempts OCR with
-  `pdf2image`/Tesseract when no text layer exists. Includes `get_pdf_page_count()` to extract page metadata.
+  `pdf2image`/Tesseract when no text layer exists. Both paths preserve every physical page with a
+  `[PDF_PAGE:n]` marker, including empty pages. Includes `get_pdf_page_count()` to extract page metadata.
   DOCX extraction includes paragraphs and tables; other extensions are treated as UTF-8 text except unsupported legacy `.doc`.
+- `src/preprocess.py` keeps marked PDF pages separate and copies the page marker into every chunk.
+  `src/pipeline.py` detects explicit multilingual page requests and selects matching page chunks
+  before embedding or keyword retrieval. Page ranges are limited to five physical PDF pages and
+  page context to 30,000 characters.
 - `src/i18n.py` provides automatic language detection (from browser Accept-Language header or IP geolocation),
   translation of all UI strings, and language-aware LLM prompts. Supports English, Romanian, French, Spanish, German.
   Language preference is cached in `st.session_state` and can be manually overridden via sidebar selector.
@@ -81,7 +86,7 @@ python test_langsmith.py
   `raw_answer`, `source_chunks`, `lite_mode`, build/retrieval/generation/total timings,
   `chunk_count`, `context_chars`, token counts, `estimated_tokens`, `used_live_api`,
   `response_status`, `error_type`, `error_message`,
-  `temperature`, and (in web modes) `fallback_reason`.
+  `temperature`, `requested_pdf_pages`, and (in web modes) `fallback_reason`.
 - Prompt templates live in `prompts/` and use Python `str.format` placeholders. Both RAG and Direct LLM require:
   - `{context}` or `{document_text}` — document content
   - `{question}` — user question

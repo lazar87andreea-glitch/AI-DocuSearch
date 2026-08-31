@@ -142,23 +142,31 @@ def answer_question(
 
 **Process:**
 
-1. **Check answer quality (NEW: Semantic Fallback)**
+1. **Check explicit physical PDF page requests**
+    - Detect references such as `page 12`, `pages 12-14`, `pagina 12`, `página 12`, or `Seite 12`.
+    - Select every chunk labeled for those pages before embedding or keyword retrieval.
+    - Include at most the first five requested pages and 30,000 context characters.
+    - If a requested page is unavailable, tell the model that directly instead of retrieving unrelated chunks.
+    - Physical PDF numbering starts at the first file page and may differ from numbers printed in the document.
+
+2. **Check answer quality (Semantic Fallback)**
    - After RAG returns an answer, hybrid mode checks if it's inconclusive
    - Inconclusive patterns detected: "does not provide", "does not contain", "not found in", "cannot find", "i don't know", "unclear", "not specified", "not mentioned"
-   - If inconclusive, automatically invokes Direct LLM mode for a better answer using general knowledge
+    - If inconclusive, automatically invokes Direct LLM mode for a better answer using the full text
+    - Explicit page requests do not use this fallback because their context was selected deterministically
    - Fallback reason is tracked in result for metrics transparency
 
-2. **Branch on lite mode (timed)**
+3. **Branch on lite mode (timed)**
    - If `pipeline["index"] is None` (lite mode), retrieval uses `_lightweight_indices` (keyword
      overlap) instead of semantic search — see Step 5.2b.
    - Otherwise, calls `pipeline["index"].search(question, k=top_k)` for semantic retrieval.
    - Wall-clock time for this step is captured as `retrieval_seconds`.
 
-2. **Construct Context String**
+4. **Construct Context String**
    - Extract chunks at returned indices (bounds-checked against `len(chunks)`)
    - Join with double newlines for clarity
 
-3. **Build Prompt (Step 4)**
+5. **Build Prompt (Step 4)**
    - Load `prompts/rag_prompt.txt` via
      `load_prompt_with_temperature("rag_prompt", context=context, question=question)` from
      `src/prompt_loader.py`, which returns both the rendered prompt and the temperature to use for
@@ -168,16 +176,19 @@ def answer_question(
      explicitly passed (e.g. for tests or CLI use); the unified web app doesn't pass one, so the
      prompt file's directive is what controls it there.
 
-4. **Generate Answer (Step 4, timed and with token metrics)**
+6. **Generate Answer (Step 4, timed and with token metrics)**
    - Call `generate_answer_with_meta(prompt, temperature=resolved_temperature)` — a live provider
     call, an explicit missing-config simulation, or a configured-provider error — returning the
     answer state plus `elapsed_seconds`, token counts, temperature, and usage provenance.
 
-5. **Format Results**
+7. **Format Results**
    - Return dictionary with `query`, `raw_answer`, `source_chunks`, `lite_mode`, plus metrics:
      `retrieval_seconds`, `generation_seconds`, `total_seconds`, `chunk_count`, `context_chars`,
          `prompt_tokens`, `completion_tokens`, `total_tokens`, `estimated_tokens`, `used_live_api`,
-         `response_status`, `error_type`, `error_message`, `temperature`
+         `response_status`, `error_type`, `error_message`, `temperature`, `requested_pdf_pages`
+
+`requested_pdf_pages` is empty for normal semantic questions. DOCX and TXT inputs do not support
+deterministic page addressing because they have no stable physical PDF page boundaries.
 
 **Implementation:**
 ```python

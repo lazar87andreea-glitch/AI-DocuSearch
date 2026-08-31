@@ -28,8 +28,8 @@ def extract_text_from_pdf(path: str) -> str:
 2. Initialize a `PdfReader` object with the file path
 3. Iterate through all pages in the PDF
 4. Extract text from each page using `.extract_text()`
-5. Handle empty pages with fallback to empty string
-6. Join all page texts with newline separators
+5. Preserve every physical page, including empty pages, with a `[PDF_PAGE:n]` marker
+6. Join marked page texts with blank-line separators while retaining the string return type
 
 **Error Handling:**
 - If `pypdf` is not installed, raises `RuntimeError` with installation instructions
@@ -82,7 +82,8 @@ renders each page to an image and runs OCR to recover the text.
 **Process:**
 1. Convert PDF pages to images using `pdf2image.convert_from_path` (300 DPI)
 2. Run `pytesseract.image_to_string` on each page image
-3. Join all page texts with newline separators
+3. Add the same `[PDF_PAGE:n]` marker used by searchable extraction, even when OCR fails for a page
+4. Join marked page texts with blank-line separators
 
 **Configuration (optional environment variables):**
 - `TESSERACT_CMD` — path to the Tesseract executable, if not on `PATH`
@@ -115,7 +116,7 @@ def extract_text(path: str) -> str:
 2. Extract file extension using `os.path.splitext()`
 3. Convert extension to lowercase for case-insensitive matching
 4. Route to appropriate extraction function based on extension:
-   - `.pdf` → `extract_text_from_pdf()`; if that returns empty/blank text, automatically retries
+     - `.pdf` → `extract_text_from_pdf()`; if that returns only page markers with no text, automatically retries
      with `extract_text_from_pdf_ocr()` (using `POPPLER_PATH` if set) before giving up
    - `.docx` → `extract_text_from_docx()`
    - `.doc` → raises `RuntimeError` (legacy `.doc` is **not** supported; convert to `.docx` or plain text first)

@@ -8,6 +8,7 @@ The preprocessing step cleans the raw extracted text and divides it into overlap
 - Normalize line breaks and spacing
 - Split text into manageable chunks with context overlap
 - Maintain semantic coherence across chunks
+- Keep physical PDF pages separate and copy `[PDF_PAGE:n]` into every chunk from that page
 - Prepare text for embedding generation
 
 ## Key Concepts
@@ -102,6 +103,10 @@ if not text:
 ```
 
 **Process:**
+When `[PDF_PAGE:n]` markers are present, each page is chunked independently. Every resulting chunk
+starts with its page marker, no chunk crosses a page boundary, and an empty physical page retains a
+marker-only chunk. Unmarked DOCX and TXT content follows the generic sliding-window process below.
+
 1. Initialize empty chunks list and start position (0)
 2. **Sliding Window Loop:**
    - Calculate end position: `min(start + chunk_size, text_length)`
